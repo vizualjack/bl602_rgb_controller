@@ -43,6 +43,7 @@
         "list": "cpp",
         "string": "cpp",
         "optional": "cpp",
-        "new": "cpp"
+        "new": "cpp",
+        "stdint.h": "c"
     }
 }

@@ -1063,8 +1063,9 @@ static void custom_task_func(void *pvParameters) {
             // puts("Init lwip...");
             // lwip_init();
             ap_started = true;
+            break;
         }
-        vTaskDelay(1000);
+        vTaskDelay(3000);
     }
     puts("Custom task end");
     vTaskDelete(NULL);
