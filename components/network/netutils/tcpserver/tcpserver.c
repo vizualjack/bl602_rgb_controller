@@ -92,7 +92,6 @@ void TCP_Server(void *pvParameters)
     }
 
     printf("We are waiting a connection on port 5150.\r\n");
-    printf("Listen(正在监听)...\r\n");
 
     maxsock = listening_socket;
     client_addrlen = sizeof(client_addr);

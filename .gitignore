@@ -2,6 +2,7 @@
 .idea
 
 **/build_out
+*.log
 
 # Linux
 *.swp

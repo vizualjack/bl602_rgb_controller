@@ -856,7 +856,6 @@ static void aos_loop_proc(void *pvParameters)
 
     aos_register_event_filter(EV_WIFI, event_cb_wifi_event, NULL);
     cmd_stack_wifi(NULL, 0, 0, NULL);
-
     aos_loop_run();
 
     puts("------------------------------------------\r\n");
@@ -991,7 +990,7 @@ void bfl_main()
     time_main = bl_timer_now_us();
     /*Init UART In the first place*/
     bl_uart_init(0, 16, 7, 255, 255, 2 * 1000 * 1000);
-    puts("Starting bl602 now....\r\n");
+    // puts("Starting bl602 now....\r\n");
 
     _dump_boot_info();
 
@@ -1005,9 +1004,9 @@ void bfl_main()
     system_init();
     system_thread_init();
 
-    puts("[OS] Starting proc_hellow_entry task...\r\n");
+    puts("[OS] Added proc_hellow_entry task\r\n");
     xTaskCreateStatic(proc_hellow_entry, (char*)"hellow", 512, NULL, 15, proc_hellow_stack, &proc_hellow_task);
-    puts("[OS] Starting aos_loop_proc task...\r\n");
+    puts("[OS] Added aos_loop_proc task\r\n");
     xTaskCreateStatic(aos_loop_proc, (char*)"event_loop", 1024, NULL, 15, aos_loop_proc_stack, &aos_loop_proc_task);
     puts("[OS] Starting TCP/IP Stack...\r\n");
     tcpip_init(NULL, NULL);
