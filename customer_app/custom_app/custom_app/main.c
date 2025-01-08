@@ -82,15 +82,6 @@
 #include <libfdt.h>
 #include <blog.h>
 
-
-// #include "lwip/tcpip.h"
-// #include "lwip/api.h"
-// #include "lwip/err.h"
-// #include "lwip/init.h"
-// #include "lwip/netif.h"
-// #include "netif/ethernet.h"
-// #include <httpd.h>
-
 #define mainHELLO_TASK_PRIORITY     ( 20 )
 #define UART_ID_2 (2)
 #define WIFI_AP_PSM_INFO_SSID           "conf_ap_ssid"
@@ -991,61 +982,6 @@ static void system_thread_init()
     /*nothing here*/
 }
 
-// ///////// CUSTOM CODE HERE
-// // Static HTML page content
-// const char *html_page =
-//     "<html><head><title>BL602 HTTP Server</title></head>"
-//     "<body><h1>Hello, World!</h1><p>This is a simple HTTP server running on BL602!</p></body></html>";
-
-// // HTTP handler for the root page
-// err_t httpd_handler(struct netconn *conn) {
-//     struct netbuf *inbuf;
-//     char *buf;
-//     u16_t buflen;
-
-//     // Receive HTTP request
-//     if (netconn_recv(conn, &inbuf) == ERR_OK) {
-//         netbuf_data(inbuf, (void **)&buf, &buflen);
-//         printf("HTTP Request: %s\n", buf);
-
-//         // Send HTTP response
-//         const char *response =
-//             "HTTP/1.1 200 OK\r\n"
-//             "Content-Type: text/html\r\n"
-//             "Connection: close\r\n\r\n";
-//         netconn_write(conn, response, strlen(response), NETCONN_COPY);
-//         netconn_write(conn, html_page, strlen(html_page), NETCONN_COPY);
-//     }
-
-//     // Close and delete the connection
-//     netconn_close(conn);
-//     netbuf_delete(inbuf);
-
-//     return ERR_OK;
-// }
-
-
-// // Start the HTTP server
-// void http_server_start(void) {
-//     struct netconn *conn, *newconn;
-
-//     // Create a new TCP connection
-//     conn = netconn_new(NETCONN_TCP);
-//     netconn_bind(conn, IP_ADDR_ANY, 80);
-//     netconn_listen(conn);
-
-//     puts("HTTP server listening on port 80...\n");
-
-//     while (1) {
-//         // Accept new connections
-//         if (netconn_accept(conn, &newconn) == ERR_OK) {
-//             httpd_handler(newconn);
-//             netconn_delete(newconn);
-//         }
-//     }
-// }
-// ////////////////////////////////////////////////////////////////
-
 int timeout = 1000;
 bool ap_started = false;
 static void custom_task_func(void *pvParameters) {
@@ -1060,8 +996,6 @@ static void custom_task_func(void *pvParameters) {
         if(!ap_started && finished_init) {
             puts("Starting ap...");
             wifi_mgmr_ap_start(wifi_mgmr_ap_enable(), "Test this", 0, NULL, 1);
-            // puts("Init lwip...");
-            // lwip_init();
             ap_started = true;
             break;
         }
@@ -1076,15 +1010,15 @@ void bfl_main()
 {
     static StackType_t aos_loop_proc_stack[1024];
     static StaticTask_t aos_loop_proc_task;
-    // static StackType_t proc_hellow_stack[512];
-    // static StaticTask_t proc_hellow_task;
+    static StackType_t proc_hellow_stack[512];
+    static StaticTask_t proc_hellow_task;
     static StackType_t custom_task_stack[512];
     static StaticTask_t custom_task;
 
-    // time_main = bl_timer_now_us();
-    // /*Init UART In the first place*/
+    time_main = bl_timer_now_us();
+    /*Init UART In the first place*/
     bl_uart_init(0, 16, 7, 255, 255, 2 * 1000 * 1000);
-    puts("Starting bl602 now....\r\n");
+    // puts("Starting bl602 now....\r\n");
 
     _dump_boot_info();
 
@@ -1098,11 +1032,11 @@ void bfl_main()
     system_init();
     system_thread_init();
 
-    // puts("[OS] Added proc_hellow_entry task\r\n");
-    // xTaskCreateStatic(proc_hellow_entry, (char*)"hellow", 512, NULL, 15, proc_hellow_stack, &proc_hellow_task);
+    puts("[OS] Added proc_hellow_entry task\r\n");
+    xTaskCreateStatic(proc_hellow_entry, (char*)"hellow", 512, NULL, 15, proc_hellow_stack, &proc_hellow_task);
     puts("[OS] Added aos_loop_proc task\r\n");
     xTaskCreateStatic(aos_loop_proc, (char*)"event_loop", 1024, NULL, 15, aos_loop_proc_stack, &aos_loop_proc_task);
-    puts("[OS] Added custom task\r\n");
+    puts("[OS] Starting TCP/IP Stack...\r\n");
     xTaskCreateStatic(custom_task_func, (char*)"custom_task", 512, NULL, 15, custom_task_stack, &custom_task);
     puts("[OS] Starting TCP/IP Stack...\r\n");
     tcpip_init(NULL, NULL);
