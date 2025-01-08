@@ -3,7 +3,7 @@
 
 **/build_out
 *.log
-.sync*
+.sync_*
 img_create/**
 
 # Linux
