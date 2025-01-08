@@ -44,6 +44,13 @@
         "string": "cpp",
         "optional": "cpp",
         "new": "cpp",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "algorithm": "c",
+        "xtr1common": "c",
+        "istream": "c",
+        "ostream": "c",
+        "ratio": "c",
+        "tuple": "c",
+        "utility": "c"
     }
 }

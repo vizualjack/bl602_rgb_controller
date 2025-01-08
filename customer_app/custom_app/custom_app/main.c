@@ -1058,6 +1058,8 @@ static void system_thread_init()
 
 int timeout = 1000;
 bool ap_started = false;
+
+
 static void custom_task_func(void *pvParameters) {
     vTaskDelay(1000);
     while (1) {
@@ -1065,6 +1067,23 @@ static void custom_task_func(void *pvParameters) {
             puts("Starting ap...");
             wifi_mgmr_ap_start(wifi_mgmr_ap_enable(), "Test this", 0, NULL, 1);
             ap_started = true;
+            char value = 0;
+            puts("=== Easyflash env ===\n");
+            ef_print_env();
+            puts("=====================\n");
+            struct env_node_obj env_node;
+            if (ef_get_env_obj("testval", &env_node)) {
+                size_t readlen = ef_get_env_blob("testval", &value, sizeof(char), NULL);
+                printf("Readlen: %i\n", readlen);
+                printf("Current value: %i\n", value);
+            } else {
+                puts("Couldn't find env_obj\n");
+            }
+            value++;
+            char value_str[2];
+            value_str[0] = value;
+            value_str[1] = '\0';
+            ef_set_env("testval", (const char *)&value_str);
             break;
         }
         vTaskDelay(3000);

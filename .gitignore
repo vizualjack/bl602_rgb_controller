@@ -4,7 +4,9 @@
 **/build_out
 *.log
 .sync_*
-img_create/**
+*.bin*
+*.pack
+
 
 # Linux
 *.swp
