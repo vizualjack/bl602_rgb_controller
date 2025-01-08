@@ -82,6 +82,8 @@
 #include <libfdt.h>
 #include <blog.h>
 
+#include "lwip/api.h"
+
 #define mainHELLO_TASK_PRIORITY     ( 20 )
 #define UART_ID_2 (2)
 #define WIFI_AP_PSM_INFO_SSID           "conf_ap_ssid"
@@ -372,6 +374,76 @@ static void wifi_sta_connect(char *ssid, char *password)
     wifi_mgmr_sta_connect(wifi_interface, ssid, password, NULL, NULL, 0, 0);
 }
 
+
+///////// CUSTOM CODE HERE
+// Static HTML page content
+const char *html_page =
+    "<html><head><title>BL602 HTTP Server</title></head>"
+    "<body><h1>Hello, World!</h1><p>This is a simple HTTP server running on BL602!</p><p id='path'>Path here</p></body></html>"
+    "<script>document.getElementById('path').innerHTML = document.location.href;</script>";
+
+// HTTP handler for the root page
+err_t httpd_handler(struct netconn *conn) {
+    struct netbuf *inbuf;
+    char *buf;
+    u16_t buflen;
+
+    // Receive HTTP request
+    if (netconn_recv(conn, &inbuf) == ERR_OK) {
+        netbuf_data(inbuf, (void **)&buf, &buflen);
+        printf("HTTP Request: %s\n", buf);
+
+        // Send HTTP response
+        const char *response =
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/html\r\n"
+            "Connection: close\r\n\r\n";
+        netconn_write(conn, response, strlen(response), NETCONN_COPY);
+        netconn_write(conn, html_page, strlen(html_page), NETCONN_COPY);
+    }
+
+    // Close and delete the connection
+    netconn_close(conn);
+    netbuf_delete(inbuf);
+
+    return ERR_OK;
+}
+
+// Start the HTTP server
+void http_server(void) {
+    struct netconn *conn, *newconn;
+    puts("[http_server] Starting...\r\n");
+    // Create a new TCP connection
+    conn = netconn_new(NETCONN_TCP);
+    netconn_bind(conn, IP_ADDR_ANY, 80);
+    netconn_listen(conn);
+
+    puts("[http_server] Listening on port 80......\r\n");
+
+    while (1) {
+        // Accept new connections
+        if (netconn_accept(conn, &newconn) == ERR_OK) {
+            puts("[http_server] New tcp connection established\n");
+            httpd_handler(newconn);
+            netconn_delete(newconn);
+            puts("[http_server] Tcp connection closed successfully\n");
+        }
+        else {
+            puts("[http_server] Couldn't establish tcp connection\n");
+        }
+    }
+}
+////////////////////////////////////////////////////////////////
+
+static void startWebserver() {
+    puts("Start http server thread...\r\n");
+    sys_thread_new("http_server", (lwip_thread_fn) &http_server, NULL, 4000, (( 32 ) - 2));
+}
+
+static void stopWebserver() {
+    
+}
+
 static void event_cb_wifi_event(input_event_t *event, void *private_data)
 {
     static char *ssid;
@@ -497,11 +569,13 @@ static void event_cb_wifi_event(input_event_t *event, void *private_data)
         case CODE_WIFI_ON_AP_STA_ADD:
         {
             printf("[APP] [EVT] [AP] [ADD] %lld, sta idx is %lu\r\n", aos_now_ms(), (uint32_t)event->value);
+            startWebserver();
         }
         break;
         case CODE_WIFI_ON_AP_STA_DEL:
         {
             printf("[APP] [EVT] [AP] [DEL] %lld, sta idx is %lu\r\n", aos_now_ms(), (uint32_t)event->value);
+            stopWebserver();
         }
         break;
         default:
@@ -986,13 +1060,7 @@ int timeout = 1000;
 bool ap_started = false;
 static void custom_task_func(void *pvParameters) {
     vTaskDelay(1000);
-
     while (1) {
-        if (ap_started) {
-            // puts("Starting http server...\r\n");
-            // http_server_start();
-            break;
-        }
         if(!ap_started && finished_init) {
             puts("Starting ap...");
             wifi_mgmr_ap_start(wifi_mgmr_ap_enable(), "Test this", 0, NULL, 1);

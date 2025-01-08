@@ -3,6 +3,8 @@
 
 **/build_out
 *.log
+.sync*
+img_create/**
 
 # Linux
 *.swp
