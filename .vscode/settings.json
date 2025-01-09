@@ -51,6 +51,7 @@
         "ostream": "c",
         "ratio": "c",
         "tuple": "c",
-        "utility": "c"
+        "utility": "c",
+        "bl_sys_ota.h": "c"
     }
 }

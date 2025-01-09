@@ -1,0 +1,87 @@
+const char *html_page = "\
+<!DOCTYPE html>\
+<html lang=\"en\">\
+<head>\
+    <meta charset=\"UTF-8\">\
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\
+    <title>BL602 Firmware Upload</title>\
+    <style>\
+        body {\
+            font-family: Arial, sans-serif;\
+            margin: 2em;\
+        }\
+        .container {\
+            max-width: 500px;\
+            margin: 0 auto;\
+            padding: 2em;\
+            border: 1px solid #ddd;\
+            border-radius: 8px;\
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);\
+        }\
+        h1 {\
+            font-size: 1.5em;\
+            text-align: center;\
+        }\
+        input[type=\"file\"] {\
+            display: block;\
+            margin: 1em 0;\
+        }\
+        button {\
+            display: block;\
+            width: 100%;\
+            padding: 0.7em;\
+            font-size: 1em;\
+            color: #fff;\
+            background-color: #007bff;\
+            border: none;\
+            border-radius: 4px;\
+            cursor: pointer;\
+        }\
+        button:hover {\
+            background-color: #0056b3;\
+        }\
+    </style>\
+</head>\
+<body>\
+    <div class=\"container\">\
+        <h1>Firmware Upload</h1>\
+        <form id=\"uploadForm\" action=\"/upload\" method=\"POST\" enctype=\"multipart/form-data\">\
+            <label for=\"firmwareFile\">Select Firmware File:</label>\
+            <input type=\"file\" id=\"firmwareFile\" name=\"file\" accept=\".bin\" required>\
+            <button type=\"submit\">Upload Firmware</button>\
+        </form>\
+        <p id=\"statusMessage\" style=\"text-align: center; margin-top: 1em;\"></p>\
+    </div>\
+\
+    <script>\
+        const form = document.getElementById('uploadForm');\
+        const statusMessage = document.getElementById('statusMessage');\
+\
+        form.addEventListener('submit', async (event) => {\
+            event.preventDefault(); // Prevent default form submission\
+\
+            // Show a loading message\
+            statusMessage.textContent = 'Uploading firmware... Please wait.';\
+\
+            const formData = new FormData(form);\
+\
+            try {\
+                const response = await fetch('/upload', {\
+                    method: 'POST',\
+                    body: formData,\
+                });\
+\
+                if (response.ok) {\
+                    statusMessage.textContent = 'Firmware uploaded successfully! The device will reboot.';\
+                } else {\
+                    statusMessage.textContent = 'Failed to upload firmware. Please try again.';\
+                }\
+            } catch (error) {\
+                console.error('Upload error:', error);\
+                statusMessage.textContent = 'An error occurred. Please check your connection and try again.';\
+            }\
+        });\
+    </script>\
+</body>\
+</html>\
+";

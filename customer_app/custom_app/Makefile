@@ -9,6 +9,18 @@ PROJECT_BOARD := evb
 export PROJECT_PATH PROJECT_BOARD
 #CONFIG_TOOLPREFIX :=
 
+HTML = page.html
+HEADER = page.h
+HTML_FILE_PATH := $(PROJECT_PATH)/$(PROJECT_NAME)/$(HTML)
+HEADER_FILE_PATH := $(PROJECT_PATH)/$(PROJECT_NAME)/$(HEADER)
+
+
+$(HEADER):
+	@echo "Generating $(HEADER) from $(HTML)"
+	@echo 'const char *html_page = "\' > $(HEADER_FILE_PATH)
+	@sed 's/"/\\"/g; s/$$/\\/' $(HTML_FILE_PATH) >> $(HEADER_FILE_PATH)
+	@echo '";' >> $(HEADER_FILE_PATH)
+
 -include ./proj_config.mk
 
 ifeq ($(origin BL60X_SDK_PATH), undefined)

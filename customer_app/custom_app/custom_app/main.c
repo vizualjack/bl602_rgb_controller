@@ -62,6 +62,7 @@
 #include <bl_timer.h>
 #include <bl_gpio_cli.h>
 #include <bl_wdt_cli.h>
+#include <bl_sys_ota.h>
 #include <hal_uart.h>
 #include <hal_sys.h>
 #include <hal_gpio.h>
@@ -83,6 +84,7 @@
 #include <blog.h>
 
 #include "lwip/api.h"
+#include "page.h"
 
 #define mainHELLO_TASK_PRIORITY     ( 20 )
 #define UART_ID_2 (2)
@@ -376,11 +378,52 @@ static void wifi_sta_connect(char *ssid, char *password)
 
 
 ///////// CUSTOM CODE HERE
-// Static HTML page content
-const char *html_page =
-    "<html><head><title>BL602 HTTP Server</title></head>"
-    "<body><h1>Hello, World!</h1><p>This is a simple HTTP server running on BL602!</p><p id='path'>Path here</p></body></html>"
-    "<script>document.getElementById('path').innerHTML = document.location.href;</script>";
+
+err_t handle_firmware_upload(struct netconn *conn, char *request_buf, u16_t request_len) {
+    // Initialize OTA
+    // int ret = ota_init("ota_update");
+    // if (ret != 0) {
+    //     printf("[handle_firmware_upload] OTA initialization failed: %d\n", ret);
+    //     return ERR_VAL;
+    // }
+
+    // // Extract the firmware binary from the HTTP POST body
+    // char *body = strstr(request_buf, "\r\n\r\n");
+    // if (!body) {
+    //     puts("[handle_firmware_upload] HTTP body not found\n");
+    //     ota_deinit();
+    //     return ERR_VAL;
+    // }
+
+    // body += 4;  // Skip over "\r\n\r\n" to the start of the firmware binary
+    // u16_t body_len = request_len - (body - request_buf);
+
+    // // Write the firmware to the OTA partition
+    // ret = ota_write(body, body_len);
+    // if (ret != 0) {
+    //     printf("[handle_firmware_upload] OTA write failed: %d\n", ret);
+    //     ota_deinit();
+    //     return ERR_VAL;
+    // }
+
+    // printf("[handle_firmware_upload] Firmware uploaded: %d bytes\n", body_len);
+
+    // // Finalize OTA
+    // ret = ota_finalize();
+    // if (ret != 0) {
+    //     printf("[handle_firmware_upload] OTA finalize failed: %d\n", ret);
+    //     ota_deinit();
+    //     return ERR_VAL;
+    // }
+
+    // printf("[handle_firmware_upload] Firmware upload successful\n");
+
+    // // Apply the new firmware and reboot
+    // ota_apply();
+    // bl_sys_reset();  // Reboot the device
+
+    return ERR_OK;
+}
 
 // HTTP handler for the root page
 err_t httpd_handler(struct netconn *conn) {
@@ -393,13 +436,33 @@ err_t httpd_handler(struct netconn *conn) {
         netbuf_data(inbuf, (void **)&buf, &buflen);
         printf("HTTP Request: %s\n", buf);
 
-        // Send HTTP response
-        const char *response =
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/html\r\n"
-            "Connection: close\r\n\r\n";
-        netconn_write(conn, response, strlen(response), NETCONN_COPY);
-        netconn_write(conn, html_page, strlen(html_page), NETCONN_COPY);
+        // Check if the request is a POST (for file upload)
+        if (strncmp(buf, "POST /upload", 12) == 0) {
+            puts("[httpd_handler] Handling firmware upload...\n");
+            
+            // Parse and handle the firmware data
+            if (handle_firmware_upload(conn, buf, buflen) != ERR_OK) {
+                const char *error_response =
+                    "HTTP/1.1 500 Internal Server Error\r\n"
+                    "Connection: close\r\n\r\n"
+                    "Failed to process firmware upload.";
+                netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+            } else {
+                const char *success_response =
+                    "HTTP/1.1 200 OK\r\n"
+                    "Connection: close\r\n\r\n"
+                    "Firmware uploaded successfully.";
+                netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
+            }
+        } else {
+            // Default response (serves an HTML page)
+            const char *response =
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html\r\n"
+                "Connection: close\r\n\r\n";
+            netconn_write(conn, response, strlen(response), NETCONN_COPY);
+            netconn_write(conn, html_page, strlen(html_page), NETCONN_COPY);
+        }
     }
 
     // Close and delete the connection
