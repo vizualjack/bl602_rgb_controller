@@ -24,7 +24,7 @@ download_single = false
 [input_path]
 pt_bin_input = "C:\\msys64\\home\\msys\\bl602_rgb_controller\\tools\\flash_tool\\bl602\\partition\\partition_cfg_2M.toml"
 boot2_bin_input = "C:\\msys64\\home\\msys\\bl602_rgb_controller\\tools\\flash_tool\\bl602\\builtin_imgs\\blsp_boot2.bin"
-cfg2_bin_input = "C:\\msys64\\home\\msys\\OpenBL602\\customer_app\\bl602_sharedApp\\build_out\\bl602_sharedApp.bin"
+cfg2_bin_input = "C:\\msys64\\home\\msys\\bl602_rgb_controller\\customer_app\\custom_app\\build_out\\custom_app.bin"
 meida_bin_input = ""
 romfs_dir_input = ""
 mfg_bin_input = ""

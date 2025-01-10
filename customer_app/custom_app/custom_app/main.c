@@ -118,7 +118,7 @@ extern uint8_t _heap_wifi_start;
 extern uint8_t _heap_wifi_size; // @suppress("Type cannot be resolved")
 static HeapRegion_t xHeapRegions[] =
 {
-        { &_heap_start,  (unsigned int) &_heap_size}, //set on runtime
+        { &_heap_start, (unsigned int) &_heap_size}, //set on runtime
         { &_heap_wifi_start, (unsigned int) &_heap_wifi_size },
         { NULL, 0 }, /* Terminates the array. */
         { NULL, 0 } /* Terminates the array. */
@@ -378,8 +378,229 @@ static void wifi_sta_connect(char *ssid, char *password)
 
 
 ///////// CUSTOM CODE HERE
+//                                                          -1             -1
+// static int http_rest_post_flash(http_request_t* request, int startaddr, int maxaddr)
+// {
+// 	int total = 0;
+// 	int towrite = request->bodylen;
+// 	char* writebuf = request->bodystart;
+// 	int writelen = request->bodylen;
+// 	int fsize = 0;
+
+// 	ADDLOG_DEBUG(LOG_FEATURE_OTA, "OTA post len %d", request->contentLength);
+
+// 	int sockfd, i;
+// 	int ret;
+// 	struct hostent* hostinfo;
+// 	uint8_t* recv_buffer;
+// 	struct sockaddr_in dest;
+// 	iot_sha256_context ctx;
+// 	uint8_t sha256_result[32];
+// 	uint8_t sha256_img[32];
+// 	bl_mtd_handle_t handle;
+// 	//init_ota(startaddr);
+
+
+// #define OTA_PROGRAM_SIZE (512)
+// 	int ota_header_found, use_xz;
+// 	ota_header_t* ota_header = 0;
+
+// 	ret = bl_mtd_open(BL_MTD_PARTITION_NAME_FW_DEFAULT, &handle, BL_MTD_OPEN_FLAG_BACKUP);
+// 	if(ret)
+// 	{
+// 		return http_rest_error(request, -20, "Open Default FW partition failed");
+// 	}
+
+// 	recv_buffer = pvPortMalloc(OTA_PROGRAM_SIZE);
+
+// 	unsigned int buffer_offset, flash_offset, ota_addr;
+// 	uint32_t bin_size, part_size;
+// 	uint8_t activeID;
+// 	HALPartition_Entry_Config ptEntry;
+
+// 	activeID = hal_boot2_get_active_partition();
+
+// 	printf("Starting OTA test. OTA bin addr is %p, incoming len %i\r\n", recv_buffer, writelen);
+
+// 	printf("[OTA] [TEST] activeID is %u\r\n", activeID);
+
+// 	if(hal_boot2_get_active_entries(BOOT2_PARTITION_TYPE_FW, &ptEntry))
+// 	{
+// 		printf("PtTable_Get_Active_Entries fail\r\n");
+// 		vPortFree(recv_buffer);
+// 		bl_mtd_close(handle);
+// 		return http_rest_error(request, -20, "PtTable_Get_Active_Entries fail");
+// 	}
+// 	ota_addr = ptEntry.Address[!ptEntry.activeIndex];
+// 	bin_size = ptEntry.maxLen[!ptEntry.activeIndex];
+// 	part_size = ptEntry.maxLen[!ptEntry.activeIndex];
+// 	(void)part_size;
+// 	/*XXX if you use bin_size is product env, you may want to set bin_size to the actual
+// 	 * OTA BIN size, and also you need to splilt XIP_SFlash_Erase_With_Lock into
+// 	 * serveral pieces. Partition size vs bin_size check is also needed
+// 	 */
+// 	printf("Starting OTA test. OTA size is %lu\r\n", bin_size);
+
+// 	printf("[OTA] [TEST] activeIndex is %u, use OTA address=%08x\r\n", ptEntry.activeIndex, (unsigned int)ota_addr);
+
+// 	printf("[OTA] [TEST] Erase flash with size %lu...", bin_size);
+// 	hal_update_mfg_ptable();
+
+// 	//Erase in chunks, because erasing everything at once is slow and causes issues with http connection
+// 	uint32_t erase_offset = 0;
+// 	uint32_t erase_len = 0;
+// 	while(erase_offset < bin_size)
+// 	{
+// 		erase_len = bin_size - erase_offset;
+// 		if(erase_len > 0x10000)
+// 		{
+// 			erase_len = 0x10000; //Erase in 64kb chunks
+// 		}
+// 		bl_mtd_erase(handle, erase_offset, erase_len);
+// 		printf("[OTA] Erased:  %lu / %lu \r\n", erase_offset, erase_len);
+// 		erase_offset += erase_len;
+// 		rtos_delay_milliseconds(100);
+// 	}
+// 	printf("[OTA] Done\r\n");
+
+// 	if(request->contentLength >= 0)
+// 	{
+// 		towrite = request->contentLength;
+// 	}
+
+// 	// get header
+// 	// recv_buffer	
+// 	//buffer_offset = 0;
+// 	//do {
+// 	//	int take_len;
+
+// 	//	take_len = OTA_PROGRAM_SIZE - buffer_offset;
+
+// 	//	memcpy(recv_buffer + buffer_offset, writebuf, writelen);
+// 	//	buffer_offset += writelen;
+
+
+// 	//	if (towrite > 0) {
+// 	//		writebuf = request->received;
+// 	//		writelen = recv(request->fd, writebuf, request->receivedLenmax, 0);
+// 	//		if (writelen < 0) {
+// 	//			ADDLOG_DEBUG(LOG_FEATURE_OTA, "recv returned %d - end of data - remaining %d", writelen, towrite);
+// 	//		}
+// 	//	}
+// 	//} while(true)
+
+// 	buffer_offset = 0;
+// 	flash_offset = 0;
+// 	ota_header = 0;
+// 	use_xz = 0;
+
+// 	utils_sha256_init(&ctx);
+// 	utils_sha256_starts(&ctx);
+// 	memset(sha256_result, 0, sizeof(sha256_result));
+// 	do
+// 	{
+// 		char* useBuf = writebuf;
+// 		int useLen = writelen;
+
+// 		if(ota_header == 0)
+// 		{
+// 			int take_len;
+
+// 			// how much left for header?
+// 			take_len = OTA_PROGRAM_SIZE - buffer_offset;
+// 			// clamp to available len
+// 			if(take_len > useLen)
+// 				take_len = useLen;
+// 			printf("Header takes %i. ", take_len);
+// 			memcpy(recv_buffer + buffer_offset, writebuf, take_len);
+// 			buffer_offset += take_len;
+// 			useBuf = writebuf + take_len;
+// 			useLen = writelen - take_len;
+
+// 			if(buffer_offset >= OTA_PROGRAM_SIZE)
+// 			{
+// 				ota_header = (ota_header_t*)recv_buffer;
+// 				if(strncmp((const char*)ota_header, "BL60X_OTA", 9))
+// 				{
+// 					return http_rest_error(request, -20, "Invalid header ident");
+// 				}
+// 			}
+// 		}
+
+
+// 		if(ota_header && useLen)
+// 		{
+// 			if(flash_offset + useLen >= part_size)
+// 			{
+// 				return http_rest_error(request, -20, "Too large bin");
+// 			}
+// 			//ADDLOG_DEBUG(LOG_FEATURE_OTA, "%d bytes to write", writelen);
+// 			//add_otadata((unsigned char*)writebuf, writelen);
+
+// 			printf("Flash takes %i. ", useLen);
+// 			utils_sha256_update(&ctx, (byte*)useBuf, useLen);
+// 			bl_mtd_write(handle, flash_offset, useLen, (byte*)useBuf);
+// 			flash_offset += useLen;
+// 		}
+
+// 		total += writelen;
+// 		startaddr += writelen;
+// 		towrite -= writelen;
+
+
+// 		if(towrite > 0)
+// 		{
+// 			writebuf = request->received;
+// 			writelen = recv(request->fd, writebuf, request->receivedLenmax, 0);
+// 			if(writelen < 0)
+// 			{
+// 				ADDLOG_DEBUG(LOG_FEATURE_OTA, "recv returned %d - end of data - remaining %d", writelen, towrite);
+// 			}
+// 		}
+// 	} while((towrite > 0) && (writelen >= 0));
+
+// 	if(ota_header == 0)
+// 	{
+// 		return http_rest_error(request, -20, "No header found");
+// 	}
+// 	utils_sha256_finish(&ctx, sha256_result);
+// 	puts("\r\nCalculated SHA256 Checksum:");
+// 	for(i = 0; i < sizeof(sha256_result); i++)
+// 	{
+// 		printf("%02X", sha256_result[i]);
+// 	}
+// 	puts("\r\nHeader SHA256 Checksum:");
+// 	for(i = 0; i < sizeof(sha256_result); i++)
+// 	{
+// 		printf("%02X", ota_header->u.s.sha256[i]);
+// 	}
+// 	if(memcmp(ota_header->u.s.sha256, sha256_result, sizeof(sha256_img)))
+// 	{
+// 		/*Error found*/
+// 		return http_rest_error(request, -20, "SHA256 NOT Correct");
+// 	}
+// 	printf("[OTA] [TCP] prepare OTA partition info\r\n");
+// 	ptEntry.len = total;
+// 	printf("[OTA] [TCP] Update PARTITION, partition len is %lu\r\n", ptEntry.len);
+// 	hal_boot2_update_ptable(&ptEntry);
+// 	printf("[OTA] [TCP] Rebooting\r\n");
+// 	//close_ota();
+// 	vPortFree(recv_buffer);
+// 	utils_sha256_free(&ctx);
+// 	bl_mtd_close(handle);
+
+
+// 	// ADDLOG_DEBUG(LOG_FEATURE_OTA, "%d total bytes written", total);
+// 	// http_setup(request, httpMimeTypeJson);
+// 	// hprintf255(request, "{\"size\":%d}", total);
+// 	// poststr(request, NULL);
+// 	// CFG_IncrementOTACount();
+// 	return 0;
+// }
 
 err_t handle_firmware_upload(struct netconn *conn, char *request_buf, u16_t request_len) {
+    // http_rest_post_flash(request, -1, -1);
+
     // Initialize OTA
     // int ret = ota_init("ota_update");
     // if (ret != 0) {
@@ -388,16 +609,16 @@ err_t handle_firmware_upload(struct netconn *conn, char *request_buf, u16_t requ
     // }
 
     // // Extract the firmware binary from the HTTP POST body
-    // char *body = strstr(request_buf, "\r\n\r\n");
-    // if (!body) {
-    //     puts("[handle_firmware_upload] HTTP body not found\n");
-    //     ota_deinit();
-    //     return ERR_VAL;
-    // }
+    char *body = strstr(request_buf, "\r\n\r\n");
+    if (!body) {
+        puts("[handle_firmware_upload] HTTP body not found\n");
+        // ota_deinit();
+        return ERR_VAL;
+    }
 
-    // body += 4;  // Skip over "\r\n\r\n" to the start of the firmware binary
-    // u16_t body_len = request_len - (body - request_buf);
-
+    body += 4;  // Skip over "\r\n\r\n" to the start of the firmware binary
+    u16_t body_len = request_len - (body - request_buf);
+    printf("[handle_firmware_upload] Body length: %i\n", body_len);
     // // Write the firmware to the OTA partition
     // ret = ota_write(body, body_len);
     // if (ret != 0) {
@@ -424,7 +645,7 @@ err_t handle_firmware_upload(struct netconn *conn, char *request_buf, u16_t requ
 
     return ERR_OK;
 }
-
+#define MAX_BUFFER_SIZE 1024
 // HTTP handler for the root page
 err_t httpd_handler(struct netconn *conn) {
     struct netbuf *inbuf;
@@ -434,12 +655,69 @@ err_t httpd_handler(struct netconn *conn) {
     // Receive HTTP request
     if (netconn_recv(conn, &inbuf) == ERR_OK) {
         netbuf_data(inbuf, (void **)&buf, &buflen);
+        
+        printf("HTTP Length: %i\n", buflen);
         printf("HTTP Request: %s\n", buf);
 
         // Check if the request is a POST (for file upload)
-        if (strncmp(buf, "POST /upload", 12) == 0) {
+        if (strncmp(buf, "POST /ota", 9) == 0) {
             puts("[httpd_handler] Handling firmware upload...\n");
+            int content_length = 0;
+            // Parse Content-Length header
+            char *content_length_str = strstr(buf, "Content-Length:");
+            if (content_length_str) {
+                sscanf(content_length_str, "Content-Length: %d", &content_length);
+                printf("Content-Length header found: %d\n", content_length);
+            } else {
+                puts("Content-Length header not found\n");
+            }
             
+            // Find the start of the body
+            char *body_start = strstr(buf, "\r\n\r\n");
+            if (body_start) {
+                body_start += 4; // Skip past "\r\n\r\n"
+                int body_length = buflen - (body_start - buf);
+                printf("Body Start Found. Initial Body Length: %d\n", body_length);
+                // If more data is expected, read it into a buffer
+                if (body_length < content_length) {
+                    int remaining = content_length - body_length;
+                    char *post_data = malloc(content_length + 1);
+                    memcpy(post_data, body_start, body_length);
+                    netbuf_delete(inbuf);
+                    while (remaining > 0) {
+                        char chunk[MAX_BUFFER_SIZE];
+                        int to_read = remaining > MAX_BUFFER_SIZE ? MAX_BUFFER_SIZE : remaining;
+                        err_t recv_err = netconn_recv(conn, &inbuf);
+                        if (recv_err == ERR_OK) {
+                            netbuf_data(inbuf, (void **)&buf, &buflen);
+                            memcpy(post_data + body_length, buf, buflen);
+                            body_length += buflen;
+                            remaining -= buflen;
+                            netbuf_delete(inbuf);
+                        } else {
+                            printf("Error receiving additional data\n");
+                            free(post_data);
+                            netbuf_delete(inbuf);
+                            return ERR_CLSD;
+                        }
+                    }
+                    char *content_start = strstr(post_data, "\r\n\r\n");
+                    content_start += 4; // Skip past "\r\n\r\n"
+                    char *content_end = strstr(content_start, "\r\n------");
+                    int content_size = content_end - content_start;
+                    printf("Content length: %i\n", content_size);
+                    char *content = malloc(content_size + 1);
+                    memcpy(content, content_start, content_size);
+                    free(post_data);
+                    content[content_size] = '\0';
+                    printf("Full POST Data Received: %s\n", content);
+                } else {
+                    printf("POST Body: %.*s\n", body_length, body_start);
+                }
+            } else {
+                printf("Body Start not found in the request\n");
+            }
+
             // Parse and handle the firmware data
             if (handle_firmware_upload(conn, buf, buflen) != ERR_OK) {
                 const char *error_response =
@@ -937,7 +1215,7 @@ static int get_dts_addr(const char *name, uint32_t *start, uint32_t *off)
 
     offset = fdt_subnode_offset(fdt, 0, name);
     if (offset <= 0) {
-       log_error("%s NULL.\r\n", name);
+       printf("%s NULL.\r\n", name);
        return -1;
     }
 
@@ -947,12 +1225,12 @@ static int get_dts_addr(const char *name, uint32_t *start, uint32_t *off)
     return 0;
 }
 
-static void __opt_feature_init(void)
-{
-#ifdef CONF_USER_ENABLE_VFS_ROMFS
-    romfs_register();
-#endif
-}
+// static void __opt_feature_init(void)
+// {
+// #ifdef CONF_USER_ENABLE_VFS_ROMFS
+//     romfs_register();
+// #endif
+// }
 
 static void aos_loop_proc(void *pvParameters)
 {
@@ -981,7 +1259,7 @@ static void aos_loop_proc(void *pvParameters)
         hal_gpio_init_from_dts(fdt, offset);
     }
 
-    __opt_feature_init();
+    // __opt_feature_init();
     aos_loop_init();
 
     fd_console = aos_open("/dev/ttyS0", 0);
@@ -1058,48 +1336,48 @@ void vAssertCalled(void)
     }
 }
 
-static void _dump_boot_info(void)
-{
-    char chip_feature[40];
-    const char *banner;
+// static void _dump_boot_info(void)
+// {
+//     char chip_feature[40];
+//     const char *banner;
 
-    puts("Booting BL602 Chip...\r\n");
+//     puts("Booting BL602 Chip...\r\n");
 
-    /*Display Banner*/
-    if (0 == bl_chip_banner(&banner)) {
-        puts(banner);
-    }
-    puts("\r\n");
-    /*Chip Feature list*/
-    puts("\r\n");
-    puts("------------------------------------------------------------\r\n");
-    puts("RISC-V Core Feature:");
-    bl_chip_info(chip_feature);
-    puts(chip_feature);
-    puts("\r\n");
+//     /*Display Banner*/
+//     if (0 == bl_chip_banner(&banner)) {
+//         puts(banner);
+//     }
+//     puts("\r\n");
+//     /*Chip Feature list*/
+//     puts("\r\n");
+//     puts("------------------------------------------------------------\r\n");
+//     puts("RISC-V Core Feature:");
+//     bl_chip_info(chip_feature);
+//     puts(chip_feature);
+//     puts("\r\n");
 
-    puts("Build Version: ");
-    puts(BL_SDK_VER); // @suppress("Symbol is not resolved")
-    puts("\r\n");
+//     puts("Build Version: ");
+//     puts(BL_SDK_VER); // @suppress("Symbol is not resolved")
+//     puts("\r\n");
 
-    puts("PHY   Version: ");
-    puts(BL_SDK_PHY_VER); // @suppress("Symbol is not resolved")
-    puts("\r\n");
+//     puts("PHY   Version: ");
+//     puts(BL_SDK_PHY_VER); // @suppress("Symbol is not resolved")
+//     puts("\r\n");
 
-    puts("RF    Version: ");
-    puts(BL_SDK_RF_VER); // @suppress("Symbol is not resolved")
-    puts("\r\n");
+//     puts("RF    Version: ");
+//     puts(BL_SDK_RF_VER); // @suppress("Symbol is not resolved")
+//     puts("\r\n");
 
-    puts("Build Date: ");
-    puts(__DATE__);
-    puts("\r\n");
+//     puts("Build Date: ");
+//     puts(__DATE__);
+//     puts("\r\n");
 
-    puts("Build Time: ");
-    puts(__TIME__);
-    puts("\r\n");
-    puts("------------------------------------------------------------\r\n");
+//     puts("Build Time: ");
+//     puts(__TIME__);
+//     puts("\r\n");
+//     puts("------------------------------------------------------------\r\n");
 
-}
+// }
 
 static void system_init(void)
 {
@@ -1164,13 +1442,13 @@ void bfl_main()
     static StaticTask_t proc_hellow_task;
     static StackType_t custom_task_stack[512];
     static StaticTask_t custom_task;
-
+    
     time_main = bl_timer_now_us();
     /*Init UART In the first place*/
     bl_uart_init(0, 16, 7, 255, 255, 2 * 1000 * 1000);
-    // puts("Starting bl602 now....\r\n");
+    puts("Starting firmware now....\r\n");
 
-    _dump_boot_info();
+    // _dump_boot_info();
 
     vPortDefineHeapRegions(xHeapRegions);
     printf("Heap %u@%p, %u@%p\r\n",

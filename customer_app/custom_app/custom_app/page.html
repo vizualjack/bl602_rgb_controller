@@ -44,9 +44,9 @@
 <body>
     <div class="container">
         <h1>Firmware Upload</h1>
-        <form id="uploadForm" action="/upload" method="POST" enctype="multipart/form-data">
+        <form id="uploadForm" action="/ota" method="POST" enctype="multipart/form-data">
             <label for="firmwareFile">Select Firmware File:</label>
-            <input type="file" id="firmwareFile" name="file" accept=".bin" required>
+            <input type="file" id="firmwareFile" name="file" accept=".bin.xz.ota" required>
             <button type="submit">Upload Firmware</button>
         </form>
         <p id="statusMessage" style="text-align: center; margin-top: 1em;"></p>
@@ -65,9 +65,9 @@
             const formData = new FormData(form);
 
             try {
-                const response = await fetch('/upload', {
+                const response = await fetch('/ota', {
                     method: 'POST',
-                    body: formData,
+                    body: firmwareFile.files[0],
                 });
 
                 if (response.ok) {
