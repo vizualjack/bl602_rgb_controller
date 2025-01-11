@@ -44,7 +44,7 @@ const char *html_page = "\
 </head>\
 <body>\
     <div class=\"container\">\
-        <h1>Firmware Upload</h1>\
+        <h1>Firmware Upload (v1.3)</h1>\
         <form id=\"uploadForm\" action=\"/ota\" method=\"POST\" enctype=\"multipart/form-data\">\
             <label for=\"firmwareFile\">Select Firmware File:</label>\
             <input type=\"file\" id=\"firmwareFile\" name=\"file\" accept=\".bin.xz.ota\" required>\

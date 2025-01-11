@@ -380,12 +380,12 @@ static void wifi_sta_connect(char *ssid, char *password)
 
 /////// CUSTOM CODE HERE
 #define OTA_PROGRAM_SIZE (512)
-static int http_rest_post_flash(int file_size, char *file_buf)
+static int http_rest_post_flash(struct netconn *conn, int max_file_size)
 {
 	int total = 0;
-	int towrite = file_size;
-	char* writebuf = file_buf;
-	int writelen = file_size;
+	int towrite = max_file_size;
+	// char* writebuf = max_file_size;
+	int writelen = max_file_size;
 	int fsize = 0;
 
 	// ADDLOG_DEBUG(LOG_FEATURE_OTA, "OTA post len %d", request->contentLength);
@@ -404,8 +404,8 @@ static int http_rest_post_flash(int file_size, char *file_buf)
 	if(ret)
 	{
 		// return http_rest_error(request, -20, "Open Default FW partition failed");
-        puts("Open Default FW partition failed");
-        return;
+        puts("Open Default FW partition failed\r\n");
+        return 1;
 	}
 
 	recv_buffer = pvPortMalloc(OTA_PROGRAM_SIZE);
@@ -423,36 +423,38 @@ static int http_rest_post_flash(int file_size, char *file_buf)
 
 	if(hal_boot2_get_active_entries(BOOT2_PARTITION_TYPE_FW, &ptEntry))
 	{
-		printf("PtTable_Get_Active_Entries fail\r\n");
 		vPortFree(recv_buffer);
 		bl_mtd_close(handle);
 		// return http_rest_error(request, -20, "PtTable_Get_Active_Entries fail");
-        puts("PtTable_Get_Active_Entries fail");
-        return;
+        puts("PtTable_Get_Active_Entries fail\r\n");
+        return 1;
 	}
 	ota_addr = ptEntry.Address[!ptEntry.activeIndex];
 	bin_size = ptEntry.maxLen[!ptEntry.activeIndex];
+
 	// part_size = ptEntry.maxLen[!ptEntry.activeIndex];
 	// (void)part_size;
 	/*XXX if you use bin_size is product env, you may want to set bin_size to the actual
 	 * OTA BIN size, and also you need to splilt XIP_SFlash_Erase_With_Lock into
 	 * serveral pieces. Partition size vs bin_size check is also needed
 	 */
+
 	printf("Starting OTA test. OTA size is %lu\r\n", bin_size);
 
-    if(file_size >= bin_size)
+    if(max_file_size >= bin_size)
     {
         puts("BIN file is too big");
-        return;
+        return 1;
         // return http_rest_error(request, -20, "Too large bin");
     }
 
 	printf("[OTA] [TEST] activeIndex is %u, use OTA address=%08x\r\n", ptEntry.activeIndex, (unsigned int)ota_addr);
 
-	printf("[OTA] [TEST] Erase flash with size %lu...", bin_size);
+	printf("[OTA] [TEST] Erase flash with size %lu...\r\n", bin_size);
 	hal_update_mfg_ptable();
 
-	//Erase in chunks, because erasing everything at once is slow and causes issues with http connection
+	// Erase in chunks, because erasing everything at once is slow and causes issues with http connection
+    // ERASING
 	uint32_t erase_offset = 0;
 	uint32_t erase_len = 0;
 	while(erase_offset < bin_size)
@@ -468,34 +470,86 @@ static int http_rest_post_flash(int file_size, char *file_buf)
 		// rtos_delay_milliseconds(100);
 	}
 	printf("[OTA] Done\r\n");
+    // === ERASING ===
 
 
-// TODO: Edit write logic code
-// grab data from http post request and write it to flash
-	buffer_offset = 0;
-	flash_offset = 0;
-	do
-	{
-		char* useBuf = writebuf;
-		int useLen = writelen;
+    // TODO: Edit write logic code
+    // If more data is expected, read it into a buffer
+    // grab data from http post request and write it to flash
+    
+    
+    
+    struct netbuf *inbuf;
+    char *buf;
+    u16_t buflen;
+    int remaining = max_file_size;
+    // char *data_start;
+    char *data_end;
+    bool first = true;
+    flash_offset = 0;
+    while (remaining > 0) {
+        // char chunk[MAX_BUFFER_SIZE];
+        // int to_read = remaining > MAX_BUFFER_SIZE ? MAX_BUFFER_SIZE : remaining;
+        err_t recv_err = netconn_recv(conn, &inbuf);
+        if (recv_err == ERR_OK) {
+            netbuf_data(inbuf, (void **)&buf, &buflen);
+            // memcpy(post_data + body_length, buf, buflen);
+            // body_length += buflen;
+            // printf("Buflen: %d\r\n", buflen);
+            remaining -= buflen;
+            // data transmission
+            if (first) {
+                char *before = buf;
+                buf = strstr(buf, "\r\n\r\n");
+                buf += 4; // Skip past "\r\n\r\n"
+                first = false;
+                buflen -= (buf - before);
+                printf("Found start, skipping %td bytes\r\n", buf - before);
+            }
+            data_end = strstr(buf, "\r\n------");
+            if(data_end != NULL) {
+                buflen = (data_end - buf);
+                printf("Found end, last frame total bytes are %td\r\n", data_end - buf);
+            }
+            bl_mtd_write(handle, flash_offset, buflen, (u_int8_t*)buf);
+            flash_offset += buflen;
+            total += buflen;
+            printf("Flash takes %i\r\n", buflen);
+            printf("remaining %i\r\n", remaining);
+            printf("total %i\r\n", total);
+            netbuf_delete(inbuf);
+        } else {
+            puts("Error receiving additional data\n");
+            // free(post_data);
+            netbuf_delete(inbuf);
+            return ERR_CLSD;
+        }
+    }
+    // flash write logic
+	// buffer_offset = 0;
+	// flash_offset = 0;
+	// do
+	// {
+	// 	char* useBuf = writebuf;
+	// 	int useLen = writelen;
 
 
-		if(useLen)
-		{
+	// 	if(useLen)
+	// 	{
 			
-			//ADDLOG_DEBUG(LOG_FEATURE_OTA, "%d bytes to write", writelen);
-			//add_otadata((unsigned char*)writebuf, writelen);
+	// 		//ADDLOG_DEBUG(LOG_FEATURE_OTA, "%d bytes to write", writelen);
+	// 		//add_otadata((unsigned char*)writebuf, writelen);
 
-			printf("Flash takes %i. ", useLen);
-			bl_mtd_write(handle, flash_offset, useLen, (u_int8_t*)useBuf);
-			flash_offset += useLen;
-		}
+	// 		printf("Flash takes %i. ", useLen);
+	// 		bl_mtd_write(handle, flash_offset, useLen, (u_int8_t*)useBuf);
+	// 		flash_offset += useLen;
+	// 	}
 
-		total += writelen;
-		towrite -= writelen;
+	// 	total += writelen;
+	// 	towrite -= writelen;
 
-	} while((towrite > 0) && (writelen >= 0));
-// 
+	// } while((towrite > 0) && (writelen >= 0));
+    // ==== flash write logic ====
 	printf("[OTA] [TCP] prepare OTA partition info\r\n");
 	ptEntry.len = total;
 	printf("[OTA] [TCP] Update PARTITION, partition len is %lu\r\n", ptEntry.len);
@@ -503,58 +557,60 @@ static int http_rest_post_flash(int file_size, char *file_buf)
 	puts("[OTA] [TCP] Rebooting\r\n");
 	vPortFree(recv_buffer);
 	bl_mtd_close(handle);
-	return 0;
-}
-
-err_t handle_firmware_upload(struct netconn *conn, char *request_buf, u16_t request_len) {
-    // http_rest_post_flash(request, -1, -1);
-
-    // Initialize OTA
-    // int ret = ota_init("ota_update");
-    // if (ret != 0) {
-    //     printf("[handle_firmware_upload] OTA initialization failed: %d\n", ret);
-    //     return ERR_VAL;
-    // }
-
-    // // Extract the firmware binary from the HTTP POST body
-    char *body = strstr(request_buf, "\r\n\r\n");
-    if (!body) {
-        puts("[handle_firmware_upload] HTTP body not found\n");
-        // ota_deinit();
-        return ERR_VAL;
-    }
-
-    body += 4;  // Skip over "\r\n\r\n" to the start of the firmware binary
-    u16_t body_len = request_len - (body - request_buf);
-    printf("[handle_firmware_upload] Body length: %i\n", body_len);
-    // // Write the firmware to the OTA partition
-    // ret = ota_write(body, body_len);
-    // if (ret != 0) {
-    //     printf("[handle_firmware_upload] OTA write failed: %d\n", ret);
-    //     ota_deinit();
-    //     return ERR_VAL;
-    // }
-
-    // printf("[handle_firmware_upload] Firmware uploaded: %d bytes\n", body_len);
-
-    // // Finalize OTA
-    // ret = ota_finalize();
-    // if (ret != 0) {
-    //     printf("[handle_firmware_upload] OTA finalize failed: %d\n", ret);
-    //     ota_deinit();
-    //     return ERR_VAL;
-    // }
-
-    // printf("[handle_firmware_upload] Firmware upload successful\n");
-
-    // // Apply the new firmware and reboot
-    // ota_apply();
-    // bl_sys_reset();  // Reboot the device
-
+    hal_reboot();
     return ERR_OK;
 }
+
+// err_t handle_firmware_upload(struct netconn *conn, char *request_buf, u16_t request_len) {
+//     // http_rest_post_flash(request, -1, -1);
+
+//     // Initialize OTA
+//     // int ret = ota_init("ota_update");
+//     // if (ret != 0) {
+//     //     printf("[handle_firmware_upload] OTA initialization failed: %d\n", ret);
+//     //     return ERR_VAL;
+//     // }
+
+//     // Extract the firmware binary from the HTTP POST body
+//     // char *body = strstr(request_buf, "\r\n\r\n");
+//     // if (!body) {
+//     //     puts("[handle_firmware_upload] HTTP body not found\n");
+//     //     // ota_deinit();
+//     //     return ERR_VAL;
+//     // }
+
+//     // body += 4;  // Skip over "\r\n\r\n" to the start of the firmware binary
+//     // u16_t body_len = request_len - (body - request_buf);
+//     // printf("[handle_firmware_upload] Body length: %i\n", body_len);
+//     // // Write the firmware to the OTA partition
+//     // ret = ota_write(body, body_len);
+//     // if (ret != 0) {
+//     //     printf("[handle_firmware_upload] OTA write failed: %d\n", ret);
+//     //     ota_deinit();
+//     //     return ERR_VAL;
+//     // }
+
+//     // printf("[handle_firmware_upload] Firmware uploaded: %d bytes\n", body_len);
+
+//     // // Finalize OTA
+//     // ret = ota_finalize();
+//     // if (ret != 0) {
+//     //     printf("[handle_firmware_upload] OTA finalize failed: %d\n", ret);
+//     //     ota_deinit();
+//     //     return ERR_VAL;
+//     // }
+
+//     // printf("[handle_firmware_upload] Firmware upload successful\n");
+
+//     // // Apply the new firmware and reboot
+//     // ota_apply();
+//     // bl_sys_reset();  // Reboot the device
+
+//     return ERR_OK;
+// }
+
 #define MAX_BUFFER_SIZE 1024
-// HTTP handler for the root page
+
 err_t httpd_handler(struct netconn *conn) {
     struct netbuf *inbuf;
     char *buf;
@@ -579,55 +635,10 @@ err_t httpd_handler(struct netconn *conn) {
             } else {
                 puts("Content-Length header not found\n");
             }
-            
-            // Find the start of the body
-            char *body_start = strstr(buf, "\r\n\r\n");
-            if (body_start) {
-                body_start += 4; // Skip past "\r\n\r\n"
-                int body_length = buflen - (body_start - buf);
-                printf("Body Start Found. Initial Body Length: %d\n", body_length);
-                // If more data is expected, read it into a buffer
-                if (body_length < content_length) {
-                    int remaining = content_length - body_length;
-                    char *post_data = malloc(content_length + 1);
-                    memcpy(post_data, body_start, body_length);
-                    netbuf_delete(inbuf);
-                    while (remaining > 0) {
-                        char chunk[MAX_BUFFER_SIZE];
-                        int to_read = remaining > MAX_BUFFER_SIZE ? MAX_BUFFER_SIZE : remaining;
-                        err_t recv_err = netconn_recv(conn, &inbuf);
-                        if (recv_err == ERR_OK) {
-                            netbuf_data(inbuf, (void **)&buf, &buflen);
-                            memcpy(post_data + body_length, buf, buflen);
-                            body_length += buflen;
-                            remaining -= buflen;
-                            netbuf_delete(inbuf);
-                        } else {
-                            printf("Error receiving additional data\n");
-                            free(post_data);
-                            netbuf_delete(inbuf);
-                            return ERR_CLSD;
-                        }
-                    }
-                    char *content_start = strstr(post_data, "\r\n\r\n");
-                    content_start += 4; // Skip past "\r\n\r\n"
-                    char *content_end = strstr(content_start, "\r\n------");
-                    int content_size = content_end - content_start;
-                    printf("Content length: %i\n", content_size);
-                    char *content = malloc(content_size + 1);
-                    memcpy(content, content_start, content_size);
-                    free(post_data);
-                    content[content_size] = '\0';
-                    printf("Full POST Data Received: %s\n", content);
-                } else {
-                    printf("POST Body: %.*s\n", body_length, body_start);
-                }
-            } else {
-                printf("Body Start not found in the request\n");
-            }
-
+            netbuf_delete(inbuf);
+            // I KNOW I'M SENDING the firmware now
             // Parse and handle the firmware data
-            if (handle_firmware_upload(conn, buf, buflen) != ERR_OK) {
+            if (http_rest_post_flash(conn, content_length) != ERR_OK) {
                 const char *error_response =
                     "HTTP/1.1 500 Internal Server Error\r\n"
                     "Connection: close\r\n\r\n"
@@ -648,12 +659,12 @@ err_t httpd_handler(struct netconn *conn) {
                 "Connection: close\r\n\r\n";
             netconn_write(conn, response, strlen(response), NETCONN_COPY);
             netconn_write(conn, html_page, strlen(html_page), NETCONN_COPY);
+            netbuf_delete(inbuf);
         }
     }
 
     // Close and delete the connection
     netconn_close(conn);
-    netbuf_delete(inbuf);
 
     return ERR_OK;
 }

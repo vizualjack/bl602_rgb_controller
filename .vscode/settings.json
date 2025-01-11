@@ -52,6 +52,7 @@
         "ratio": "c",
         "tuple": "c",
         "utility": "c",
-        "bl_sys_ota.h": "c"
+        "bl_sys_ota.h": "c",
+        "typeinfo": "c"
     }
 }
