@@ -17,7 +17,7 @@ media_download = false
 use_romfs = false
 mfg_download = false
 ro_params_download = true
-ckb_erase_all = "False"
+ckb_erase_all = "True"
 encrypt = false
 download_single = false
 
