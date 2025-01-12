@@ -43,13 +43,25 @@
 </head>
 <body>
     <div class="container">
-        <h1>Firmware Upload (v1.3)</h1>
+        <h1>Firmware Upload</h1>
         <form id="uploadForm" action="/ota" method="POST" enctype="multipart/form-data">
             <label for="firmwareFile">Select Firmware File:</label>
-            <input type="file" id="firmwareFile" name="file" accept=".bin.xz.ota" required>
+            <input type="file" id="firmwareFile" name="file" accept=".bin.xz" required>
             <button type="submit">Upload Firmware</button>
         </form>
+
         <p id="statusMessage" style="text-align: center; margin-top: 1em;"></p>
+    </div>
+    
+    <div class="container">
+        <h1>Wifi settings</h1>
+        <form id="wifi-settings" action="/wifi" method="POST" enctype="multipart/form-data">
+            <label for="ssid">SSID:</label>
+            <input type="text" id="ssid" name="ssid" required/>
+            <label for="pass">Password:</label>
+            <input type="password" id="pass" name="pass" required/>
+            <button type="submit">Send wifi settings</button>
+        </form>
     </div>
 
     <script>

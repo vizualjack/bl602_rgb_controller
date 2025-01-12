@@ -125,7 +125,11 @@ static HeapRegion_t xHeapRegions[] =
         { NULL, 0 } /* Terminates the array. */
 };
 static wifi_interface_t wifi_interface;
+
+
 bool finished_init = false;
+static char* WIFI_SSID_KEY = "wifi_ssid";
+static char* WIFI_PASS_KEY = "wifi_pass";
 
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName )
 {
@@ -377,15 +381,58 @@ static void wifi_sta_connect(char *ssid, char *password)
     wifi_mgmr_sta_connect(wifi_interface, ssid, password, NULL, NULL, 0, 0);
 }
 
+static int http_rest_post_wifi(char* buf) {
+    // SSID
+    char* ssid_start = strstr(buf, "name=\"ssid\"\r\n\r\n");
+    ssid_start += 15;
+    if(ssid_start == NULL) {
+        puts("Can't find SSID");
+        return ERR_ARG;
+    }
+    char* ssid_end = strstr(ssid_start, "\r\n------");
+    if(ssid_end == NULL) {
+        puts("Can't find SSID end");
+        printf("Start: %s\r\n", ssid_start);
+        return ERR_ARG;
+    }
+    int ssid_len = ssid_end - ssid_start;
+    printf("SSID length: %d\r\n", ssid_len);
+    char ssid[ssid_len + 1];
+    memcpy(ssid, ssid_start, ssid_len);
+    ssid[ssid_len] = '\0';
+    printf("Wifi SSID: %s\r\n", ssid);
+    // PASSWORD
+    char* pass_start = strstr(ssid_end, "name=\"pass\"\r\n\r\n");
+    if(pass_start == NULL) {
+        puts("Can't find PASS\r\n");
+        return ERR_ARG;
+    }
+    pass_start += 15;
+    char* pass_end = strstr(pass_start, "\r\n------");
+    if(pass_end == NULL) {
+        puts("Can't find PASS end\r\n");
+        return ERR_ARG;
+    }
+    int pass_len = pass_end - pass_start;
+    printf("PASS length: %d\r\n", pass_len);
+    char pass[pass_len + 1];
+    memcpy(pass, pass_start, pass_len);
+    pass[pass_len] = '\0';
+    printf("Wifi PASS: %s\r\n", pass);
+    ef_set_env_blob(WIFI_SSID_KEY, (const char *)&ssid, ssid_len + 1);
+    ef_set_env_blob(WIFI_PASS_KEY, (const char *)&pass, pass_len + 1);
+    return ERR_OK;
+}
+
 
 /////// CUSTOM CODE HERE
 #define OTA_PROGRAM_SIZE (512)
-static int http_rest_post_flash(struct netconn *conn, int max_file_size)
+static int http_rest_post_flash(struct netconn *conn, int content_length)
 {
 	int total = 0;
-	int towrite = max_file_size;
+	int towrite = content_length;
 	// char* writebuf = max_file_size;
-	int writelen = max_file_size;
+	int writelen = content_length;
 	int fsize = 0;
 
 	// ADDLOG_DEBUG(LOG_FEATURE_OTA, "OTA post len %d", request->contentLength);
@@ -441,7 +488,7 @@ static int http_rest_post_flash(struct netconn *conn, int max_file_size)
 
 	printf("Starting OTA test. OTA size is %lu\r\n", bin_size);
 
-    if(max_file_size >= bin_size)
+    if(content_length >= bin_size)
     {
         puts("BIN file is too big");
         return 1;
@@ -482,7 +529,7 @@ static int http_rest_post_flash(struct netconn *conn, int max_file_size)
     struct netbuf *inbuf;
     char *buf;
     u16_t buflen;
-    int remaining = max_file_size;
+    int remaining = content_length;
     // char *data_start;
     char *data_end;
     bool first = true;
@@ -621,11 +668,11 @@ err_t httpd_handler(struct netconn *conn) {
         netbuf_data(inbuf, (void **)&buf, &buflen);
         
         printf("HTTP Length: %i\n", buflen);
-        printf("HTTP Request: %s\n", buf);
+        printf("HTTP Request: %s\n\n", buf);
 
         // Check if the request is a POST (for file upload)
-        if (strncmp(buf, "POST /ota", 9) == 0) {
-            puts("[httpd_handler] Handling firmware upload...\n");
+        if (strncmp(buf, "POST ", 5) == 0) {
+            puts("[httpd_handler] Handling POST request...\n");
             int content_length = 0;
             // Parse Content-Length header
             char *content_length_str = strstr(buf, "Content-Length:");
@@ -635,22 +682,58 @@ err_t httpd_handler(struct netconn *conn) {
             } else {
                 puts("Content-Length header not found\n");
             }
-            netbuf_delete(inbuf);
-            // I KNOW I'M SENDING the firmware now
-            // Parse and handle the firmware data
-            if (http_rest_post_flash(conn, content_length) != ERR_OK) {
-                const char *error_response =
-                    "HTTP/1.1 500 Internal Server Error\r\n"
-                    "Connection: close\r\n\r\n"
-                    "Failed to process firmware upload.";
-                netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
-            } else {
-                const char *success_response =
-                    "HTTP/1.1 200 OK\r\n"
-                    "Connection: close\r\n\r\n"
-                    "Firmware uploaded successfully.";
-                netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
-            }
+            if(strncmp(buf, "POST /ota", 9) == 0) {
+                netbuf_delete(inbuf);
+                puts("[httpd_handler] Handling firmware upload...\n");
+                // I KNOW I'M SENDING the firmware now
+                // Parse and handle the firmware data
+                if (http_rest_post_flash(conn, content_length) != ERR_OK) {
+                    const char *error_response =
+                        "HTTP/1.1 500 Internal Server Error\r\n"
+                        "Connection: close\r\n\r\n"
+                        "Failed to process firmware upload.";
+                    netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+                } else {
+                    const char *success_response =
+                        "HTTP/1.1 200 OK\r\n"
+                        "Connection: close\r\n\r\n"
+                        "Firmware uploaded successfully.";
+                    netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
+                }
+            } else if (strncmp(buf, "POST /wifi", 10) == 0) {
+                puts("[httpd_handler] Handling wifi settings request...\n");
+                char* body = malloc(content_length + 1);
+                char* body_start = strstr(buf, "\r\n\r\n");
+                body_start += 4;
+                char* body_end = buf + buflen;
+                int total_length = body_end - body_start;
+                printf("Total length: %i\r\n", total_length);
+                memcpy(body, body_start, total_length);
+                netbuf_delete(inbuf);
+                if (netconn_recv(conn, &inbuf) == ERR_OK) {
+                    puts("Got additional data\r\n");
+                    netbuf_data(inbuf, (void **)&buf, &buflen);
+                    printf("Additional data length: %i\r\n", buflen);
+                    memcpy(body + total_length, buf, buflen);
+                }
+                body[content_length] = '\0';
+                printf("Body: %s\r\n", body);
+                if (http_rest_post_wifi(body) != ERR_OK) {
+                    const char *error_response =
+                        "HTTP/1.1 500 Internal Server Error\r\n"
+                        "Connection: close\r\n\r\n"
+                        "Failed to process new wifi settings.";
+                    netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+                } else {
+                    const char *success_response =
+                        "HTTP/1.1 200 OK\r\n"
+                        "Connection: close\r\n\r\n"
+                        "Changed wifi settings.";
+                    netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
+                }
+                netbuf_delete(inbuf);
+                free(body);
+            } else netbuf_delete(inbuf);
         } else {
             // Default response (serves an HTML page)
             const char *response =
@@ -770,6 +853,7 @@ static void event_cb_wifi_event(input_event_t *event, void *private_data)
         {
             printf("[APP] [EVT] GOT IP %lld\r\n", aos_now_ms());
             printf("[SYS] Memory left is %d Bytes\r\n", xPortGetFreeHeapSize());
+            startWebserver();
         }
         break;
         case CODE_WIFI_ON_EMERGENCY_MAC:
@@ -1317,33 +1401,62 @@ static void system_thread_init()
 }
 
 int timeout = 1000;
-bool ap_started = false;
 
+static char* get_saved_ssid() {
+    // size_t content_len = 0;
+    struct env_node_obj info_obj;
+    if (!ef_get_env_obj(WIFI_SSID_KEY, &info_obj)) return NULL;
+    printf("SSID length: %d\n", info_obj.value_len);
+    if(info_obj.value_len <= 0) return NULL;
+    char* ssid = malloc(info_obj.value_len);
+    ef_get_env_blob(WIFI_SSID_KEY, ssid, info_obj.value_len, NULL);
+    return ssid;
+}
+
+static char* get_saved_pass() {
+    // size_t content_len = 0;
+    struct env_node_obj info_obj;
+    if (!ef_get_env_obj(WIFI_PASS_KEY, &info_obj)) return NULL;
+    if(info_obj.value_len <= 0) return NULL;
+    char* pass = malloc(info_obj.value_len);
+    ef_get_env_blob(WIFI_PASS_KEY, pass, info_obj.value_len, NULL);
+    return pass;
+}
+
+static bool connect_to_wifi(char* ssid, char* pass) {
+    // int ret;
+    // if ((ret = aos_post_event(EV_WIFI, CODE_WIFI_ON_PROV_SSID, (unsigned long) ssid)) < 0) {
+    //     printf("[APP] [PROV] trigger SSID event failed, ret %d\r\n", ret);
+    //     return false;
+    // } 
+    // if ((ret = aos_post_event(EV_WIFI, CODE_WIFI_ON_PROV_PASSWD, (unsigned long) pass)) < 0) {
+    //     printf("[APP] [PROV] trigger PASSWD event failed, ret %d\r\n", ret);
+    //     return false;
+    // }
+    // return aos_post_event(EV_WIFI, CODE_WIFI_ON_PROV_CONNECT, 0) >= 0;
+    wifi_sta_connect(ssid, pass);
+    return true;
+}
 
 static void custom_task_func(void *pvParameters) {
     vTaskDelay(1000);
     while (1) {
-        if(!ap_started && finished_init) {
-            puts("Starting ap...");
-            wifi_mgmr_ap_start(wifi_mgmr_ap_enable(), "Test this", 0, NULL, 1);
-            ap_started = true;
-            char value = 0;
-            puts("=== Easyflash env ===\n");
+        if(finished_init) {
             ef_print_env();
-            puts("=====================\n");
-            struct env_node_obj env_node;
-            if (ef_get_env_obj("testval", &env_node)) {
-                size_t readlen = ef_get_env_blob("testval", &value, sizeof(char), NULL);
-                printf("Readlen: %i\n", readlen);
-                printf("Current value: %i\n", value);
-            } else {
-                puts("Couldn't find env_obj\n");
+            char* ssid = get_saved_ssid();
+            char* pass = get_saved_pass();
+            printf("SSID: %s\r\n", ssid);
+            printf("PASS: %s\r\n", pass);
+            if (ssid != NULL && pass != NULL) {
+                puts("Connecting to wifi...");
+                connect_to_wifi(ssid, pass);
             }
-            value++;
-            char value_str[2];
-            value_str[0] = value;
-            value_str[1] = '\0';
-            ef_set_env("testval", (const char *)&value_str);
+            else {
+                if(ssid != NULL) free(ssid);
+                if(pass != NULL) free(pass);
+                puts("Starting ap...");
+                wifi_mgmr_ap_start(wifi_mgmr_ap_enable(), "Test this", 0, NULL, 1);
+            }
             break;
         }
         vTaskDelay(3000);
@@ -1379,11 +1492,10 @@ void bfl_main()
     system_init();
     system_thread_init();
 
-    puts("[OS] Added proc_hellow_entry task\r\n");
-    xTaskCreateStatic(proc_hellow_entry, (char*)"hellow", 512, NULL, 15, proc_hellow_stack, &proc_hellow_task);
-    puts("[OS] Added aos_loop_proc task\r\n");
+    // puts("[OS] Added proc_hellow_entry task\r\n");
+    // xTaskCreateStatic(proc_hellow_entry, (char*)"hellow", 512, NULL, 15, proc_hellow_stack, &proc_hellow_task);
     xTaskCreateStatic(aos_loop_proc, (char*)"event_loop", 1024, NULL, 15, aos_loop_proc_stack, &aos_loop_proc_task);
-    puts("[OS] Starting TCP/IP Stack...\r\n");
+    puts("[OS] Added aos_loop_proc task\r\n");
     xTaskCreateStatic(custom_task_func, (char*)"custom_task", 512, NULL, 15, custom_task_stack, &custom_task);
     puts("[OS] Starting TCP/IP Stack...\r\n");
     tcpip_init(NULL, NULL);

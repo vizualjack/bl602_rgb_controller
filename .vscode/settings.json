@@ -53,6 +53,8 @@
         "tuple": "c",
         "utility": "c",
         "bl_sys_ota.h": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "*.tcc": "c",
+        "event_device.h": "c"
     }
 }
