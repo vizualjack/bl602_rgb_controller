@@ -55,6 +55,7 @@
         "bl_sys_ota.h": "c",
         "typeinfo": "c",
         "*.tcc": "c",
-        "event_device.h": "c"
+        "event_device.h": "c",
+        "hal_pwm.h": "c"
     }
 }

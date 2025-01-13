@@ -86,6 +86,7 @@
 #include <bl_mtd.h>
 #include "lwip/api.h"
 #include "page.h"
+#include "bl_pwm.h"
 
 #define mainHELLO_TASK_PRIORITY     ( 20 )
 #define UART_ID_2 (2)
@@ -662,6 +663,8 @@ err_t httpd_handler(struct netconn *conn) {
     struct netbuf *inbuf;
     char *buf;
     u16_t buflen;
+    static int id = 0;
+    static int pin = 0;
 
     // Receive HTTP request
     if (netconn_recv(conn, &inbuf) == ERR_OK) {
@@ -733,7 +736,91 @@ err_t httpd_handler(struct netconn *conn) {
                 }
                 netbuf_delete(inbuf);
                 free(body);
-            } else netbuf_delete(inbuf);
+            }
+            else if (strncmp(buf, "POST /pwm_start", 15) == 0) {
+                puts("[httpd_handler] Starting pwm\n");
+                char* body = malloc(content_length + 1);
+                char* body_start = strstr(buf, "\r\n\r\n");
+                body_start += 4;
+                char* body_end = buf + buflen;
+                int total_length = body_end - body_start;
+                printf("Total length: %i\r\n", total_length);
+                memcpy(body, body_start, total_length);
+                netbuf_delete(inbuf);
+                if (netconn_recv(conn, &inbuf) == ERR_OK) {
+                    puts("Got additional data\r\n");
+                    netbuf_data(inbuf, (void **)&buf, &buflen);
+                    printf("Additional data length: %i\r\n", buflen);
+                    memcpy(body + total_length, buf, buflen);
+                }
+                body[content_length] = '\0';
+                printf("[httpd_handler] body: %s\r\n", body);
+                char* start = strstr(body, "name=\"pin\"\r\n\r\n");
+                start += 14;
+                int value = atoi(start);
+                printf("[httpd_handler] pwm pin: %d\r\n", value);
+                char* end = strstr(start, "\r\n------");
+                bl_pwm_init(id, value, 60000);
+                bl_pwm_set_duty(id, 0);
+                bl_pwm_start(id);
+                netbuf_delete(inbuf);
+                pin = value;
+            }  
+            else if (strncmp(buf, "POST /pwm_edit_duty", 19) == 0) {
+                puts("[httpd_handler] Edit duty\n");
+                char* body = malloc(content_length + 1);
+                char* body_start = strstr(buf, "\r\n\r\n");
+                body_start += 4;
+                char* body_end = buf + buflen;
+                int total_length = body_end - body_start;
+                printf("Total length: %i\r\n", total_length);
+                memcpy(body, body_start, total_length);
+                netbuf_delete(inbuf);
+                if (netconn_recv(conn, &inbuf) == ERR_OK) {
+                    puts("Got additional data\r\n");
+                    netbuf_data(inbuf, (void **)&buf, &buflen);
+                    printf("Additional data length: %i\r\n", buflen);
+                    memcpy(body + total_length, buf, buflen);
+                }
+                body[content_length] = '\0';
+                printf("[httpd_handler] body: %s\r\n", body);
+                char* start = strstr(body, "name=\"duty\"\r\n\r\n");
+                start += 15;
+                int value = atoi(start);
+                printf("[httpd_handler] pwm duty: %d\r\n", value);
+                char* end = strstr(start, "\r\n------");
+                bl_pwm_stop(id);
+                bl_pwm_init(id, pin, 60000);
+                bl_pwm_set_duty(id, value);
+                bl_pwm_start(id);
+                netbuf_delete(inbuf);
+            }  
+            else if (strncmp(buf, "POST /pwm_stop", 14) == 0) {
+                puts("[httpd_handler] Stopping pwm\n");
+                bl_pwm_stop(id);
+                netbuf_delete(inbuf);
+            } 
+            // else if (strncmp(buf, "POST /stop", 10) == 0) {
+            //     // puts("[httpd_handler] Stoping pwm on pin 3...\n");
+            //     // uint8_t pin = 3;
+            //     // uint8_t id = 0;
+            //     // bl_pwm_init(id, pin, 60000);
+            //     // bl_pwm_set_duty(id, 25);
+            //     // bl_pwm_start(id);
+            //     // pin = 4;
+            //     // id = 1;
+            //     // bl_pwm_init(id, pin, 60000);
+            //     // bl_pwm_set_duty(id, 25);
+            //     // bl_pwm_start(id);
+            //     // pin = 21;
+            //     // id = 2;
+            //     // bl_pwm_init(id, pin, 60000);
+            //     // bl_pwm_set_duty(id, 25);
+            //     // bl_pwm_start(id);
+            //     // puts("[httpd_handler] Stopped pwm on pin 3\n");
+            //     netbuf_delete(inbuf);
+            // } 
+            else netbuf_delete(inbuf);
         } else {
             // Default response (serves an HTML page)
             const char *response =
@@ -779,8 +866,11 @@ void http_server(void) {
 ////////////////////////////////////////////////////////////////
 
 static void startWebserver() {
+    static bool started = false;
+    if(started) return;
     puts("Start http server thread...\r\n");
     sys_thread_new("http_server", (lwip_thread_fn) &http_server, NULL, 4000, (( 32 ) - 2));
+    started = true;
 }
 
 static void stopWebserver() {
