@@ -42,7 +42,7 @@
     </style>
 </head>
 <body>
-    <span>v0.0.18</span>
+    <span>v0.0.19</span>
     <div class="container">
         <h1>Firmware Upload</h1>
         <form id="uploadForm" action="/ota" method="POST" enctype="multipart/form-data">
@@ -50,10 +50,9 @@
             <input type="file" id="firmwareFile" name="file" accept=".bin.xz" required>
             <button type="submit">Upload Firmware</button>
         </form>
-
         <p id="statusMessage" style="text-align: center; margin-top: 1em;"></p>
     </div>
-    
+
     <div class="container">
         <h1>Wifi settings</h1>
         <form id="wifi-settings" action="/wifi" method="POST" enctype="multipart/form-data">
@@ -65,21 +64,13 @@
         </form>
     </div>
 
-    
     <div class="container">
-        <h1>PWM Start</h1>
+        <h1>PWM change</h1>
         <form id="pwm-start" action="/pwm_start" method="POST" enctype="multipart/form-data">
-            <label for="pin">Pin:</label>
-            <input type="number" id="pin" name="pin" required/>
+            <label for="pin">Pin id (0-3):</label>
+            <input type="number" id="pin_id" name="pin_id" required/>
             <input type="number" id="duty" name="duty" required/>
             <button type="submit">Start</button>
-        </form>
-    </div>
-
-    <div class="container">
-        <h1>PWM stop duty</h1>
-        <form id="pwm-stop" action="/pwm_stop" method="POST" enctype="multipart/form-data">
-            <button type="submit">Stop</button>
         </form>
     </div>
 

@@ -164,17 +164,6 @@ void vApplicationIdleHook(void)
 #endif
 }
 
-static void proc_hellow_entry(void *pvParameters)
-{
-    vTaskDelay(500);
-
-    while (1) {
-        printf("%s: RISC-V rv32imafc\r\n", __func__);
-        vTaskDelay(10000);
-    }
-    vTaskDelete(NULL);
-}
-
 static unsigned char char_to_hex(char asccode)
 {
     unsigned char ret;
@@ -258,6 +247,7 @@ int check_dts_config(char ssid[33], char password[64])
 
 static void _connect_wifi()
 {
+    puts("_connect_wifi IS IN USE");
     /*XXX caution for BIG STACK*/
     char pmk[66], bssid[32], chan[10];
     char ssid[33], password[66];
@@ -613,56 +603,6 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
     return ERR_OK;
 }
 
-// err_t handle_firmware_upload(struct netconn *conn, char *request_buf, u16_t request_len) {
-//     // http_rest_post_flash(request, -1, -1);
-
-//     // Initialize OTA
-//     // int ret = ota_init("ota_update");
-//     // if (ret != 0) {
-//     //     printf("[handle_firmware_upload] OTA initialization failed: %d\n", ret);
-//     //     return ERR_VAL;
-//     // }
-
-//     // Extract the firmware binary from the HTTP POST body
-//     // char *body = strstr(request_buf, "\r\n\r\n");
-//     // if (!body) {
-//     //     puts("[handle_firmware_upload] HTTP body not found\n");
-//     //     // ota_deinit();
-//     //     return ERR_VAL;
-//     // }
-
-//     // body += 4;  // Skip over "\r\n\r\n" to the start of the firmware binary
-//     // u16_t body_len = request_len - (body - request_buf);
-//     // printf("[handle_firmware_upload] Body length: %i\n", body_len);
-//     // // Write the firmware to the OTA partition
-//     // ret = ota_write(body, body_len);
-//     // if (ret != 0) {
-//     //     printf("[handle_firmware_upload] OTA write failed: %d\n", ret);
-//     //     ota_deinit();
-//     //     return ERR_VAL;
-//     // }
-
-//     // printf("[handle_firmware_upload] Firmware uploaded: %d bytes\n", body_len);
-
-//     // // Finalize OTA
-//     // ret = ota_finalize();
-//     // if (ret != 0) {
-//     //     printf("[handle_firmware_upload] OTA finalize failed: %d\n", ret);
-//     //     ota_deinit();
-//     //     return ERR_VAL;
-//     // }
-
-//     // printf("[handle_firmware_upload] Firmware upload successful\n");
-
-//     // // Apply the new firmware and reboot
-//     // ota_apply();
-//     // bl_sys_reset();  // Reboot the device
-
-//     return ERR_OK;
-// }
-
-#define MAX_BUFFER_SIZE 1024
-
 // 0   1   3  4
 // 20  21  3  4
 const int pwm_to_pin[4][2] = {{0,20},{1,21},{3,3},{4,4}};
@@ -763,7 +703,7 @@ err_t httpd_handler(struct netconn *conn) {
                 }
                 body[content_length] = '\0';
                 printf("[httpd_handler] body: %s\r\n", body);
-                char* start = strstr(body, "name=\"pin\"\r\n\r\n");
+                char* start = strstr(body, "name=\"pin_id\"\r\n\r\n");
                 start += 14;
                 int pin = atoi(start);
                 printf("[httpd_handler] pwm pin: %d\r\n", pin);
@@ -771,19 +711,8 @@ err_t httpd_handler(struct netconn *conn) {
                 start += 15;
                 int duty = atoi(start);
                 float duty_as_float = (float)duty;
-                // char* end;
-                // float duty = strtof(start, &end);
-                // if(end == start) {
-                //     puts("Can't convert to float\r\n");
-                // } else {
-                    printf("[httpd_handler] pwm duty: %d\r\n", duty);
-                    printf("[httpd_handler] pwm duty as float: %f\r\n", duty_as_float);
-                    printf("[httpd_handler] pwm pin id: %d\r\n", pin);
-                    // printf("[httpd_handler] prev pvm start success: %s\r\n", bl_pwm_start(id) == 0 ? "true" : "false");
-                    // bl_pwm_stop(id);
-                    int id = pwm_to_pin[pin][0];
-                    bl_pwm_set_duty(id, duty);
-                // }
+                int id = pwm_to_pin[pin][0];
+                bl_pwm_set_duty(id, duty);
                 netbuf_delete(inbuf);
             }  
             else if (strncmp(buf, "POST /pwm_edit_duty", 19) == 0) {
@@ -1005,9 +934,9 @@ static void event_cb_wifi_event(input_event_t *event, void *private_data)
         break;
         case CODE_WIFI_ON_PROV_CONNECT:
         {
-            printf("[APP] [EVT] [PROV] [CONNECT] %lld\r\n", aos_now_ms());
-            printf("connecting to %s:%s...\r\n", ssid, password);
-            wifi_sta_connect(ssid, password);
+            // printf("[APP] [EVT] [PROV] [CONNECT] %lld\r\n", aos_now_ms());
+            // printf("connecting to %s:%s...\r\n", ssid, password);
+            // wifi_sta_connect(ssid, password);
         }
         break;
         case CODE_WIFI_ON_PROV_DISCONNECT:
@@ -1035,221 +964,6 @@ static void event_cb_wifi_event(input_event_t *event, void *private_data)
     }
 }
 
-static void __attribute__((unused)) cmd_aws(char *buf, int len, int argc, char **argv)
-{
-void aws_main_entry(void *arg);
-    xTaskCreate(aws_main_entry, (char*)"aws_iot", 4096, NULL, 10, NULL);
-}
-
-static void cmd_pka(char *buf, int len, int argc, char **argv)
-{
-    bl_pka_test();
-}
-
-static void cmd_wifi(char *buf, int len, int argc, char **argv)
-{
-void mm_sec_keydump(void);
-    mm_sec_keydump();
-}
-
-static void cmd_sha(char *buf, int len, int argc, char **argv)
-{
-    bl_sec_sha_test();
-}
-
-static void cmd_trng(char *buf, int len, int argc, char **argv)
-{
-    bl_sec_test();
-}
-
-static void cmd_aes(char *buf, int len, int argc, char **argv)
-{
-    bl_sec_aes_test();
-}
-
-static void cmd_cks(char *buf, int len, int argc, char **argv)
-{
-    bl_cks_test();
-}
-
-static void cmd_dma(char *buf, int len, int argc, char **argv)
-{
-    bl_dma_test();
-}
-
-static void cmd_exception_load(char *buf, int len, int argc, char **argv)
-{
-    bl_irq_exception_trigger(BL_IRQ_EXCEPTION_TYPE_LOAD_MISALIGN, (void*)0x22008001);
-}
-
-static void cmd_exception_l_illegal(char *buf, int len, int argc, char **argv)
-{
-    bl_irq_exception_trigger(BL_IRQ_EXCEPTION_TYPE_ACCESS_ILLEGAL, (void*)0x00200000);
-}
-
-static void cmd_exception_store(char *buf, int len, int argc, char **argv)
-{
-    bl_irq_exception_trigger(BL_IRQ_EXCEPTION_TYPE_STORE_MISALIGN, (void*)0x22008001);
-}
-
-static void cmd_exception_illegal_ins(char *buf, int len, int argc, char **argv)
-{
-    bl_irq_exception_trigger(BL_IRQ_EXCEPTION_TYPE_ILLEGAL_INSTRUCTION, (void*)0x22008001);
-}
-
-#define MAXBUF          128
-#define BUFFER_SIZE     (12*1024)
-
-#define PORT 80
-
-static int client_demo(char *hostname)
-{
-    int sockfd;
-    /* Get host address from the input name */
-    struct hostent *hostinfo = gethostbyname(hostname);
-    uint8_t *recv_buffer;
-
-    if (!hostinfo) {
-        printf("gethostbyname Failed\r\n");
-        return -1;
-    }
-
-    struct sockaddr_in dest;
-
-    char buffer[MAXBUF];
-    /* Create a socket */
-    /*---Open socket for streaming---*/
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        printf("Error in socket\r\n");
-        return -1;
-    }
-
-    /*---Initialize server address/port struct---*/
-    memset(&dest, 0, sizeof(dest));
-    dest.sin_family = AF_INET;
-    dest.sin_port = htons(PORT);
-    dest.sin_addr = *((struct in_addr *) hostinfo->h_addr);
-//    char ip[16];
-    uint32_t address = dest.sin_addr.s_addr;
-    char *ip = inet_ntoa(address);
-
-    printf("Server ip Address : %s\r\n", ip);
-    /*---Connect to server---*/
-    if (connect(sockfd,
-             (struct sockaddr *)&dest,
-             sizeof(dest)) != 0) {
-        printf("Error in connect\r\n");
-        return -1;
-    }
-    /*---Get "Hello?"---*/
-    memset(buffer, 0, MAXBUF);
-    char wbuf[]
-        = "GET /ddm/ContentResource/music/204.mp3 HTTP/1.1\r\nHost: nf.cr.dandanman.com\r\nUser-Agent: wmsdk\r\nAccept: */*\r\n\r\n";
-    write(sockfd, wbuf, sizeof(wbuf) - 1);
-
-    int ret = 0;
-    int total = 0;
-    int debug_counter = 0;
-    uint32_t ticks_start, ticks_end, time_consumed;
-
-    ticks_start = xTaskGetTickCount();
-    recv_buffer = pvPortMalloc(BUFFER_SIZE);
-    if (NULL == recv_buffer) {
-        goto out;
-    }
-    while (1) {
-        ret = read(sockfd, recv_buffer, BUFFER_SIZE);
-        if (ret == 0) {
-            printf("eof\n\r");
-            break;
-        } else if (ret < 0) {
-            printf("ret = %d, err = %d\n\r", ret, errno);
-            break;
-        } else {
-            total += ret;
-            /*use less debug*/
-            if (0 == ((debug_counter++) & 0xFF)) {
-                printf("total = %d, ret = %d\n\r", total, ret);
-            }
-            //vTaskDelay(2);
-            if (total > 82050000) {
-                ticks_end = xTaskGetTickCount();
-                time_consumed = ((uint32_t)(((int32_t)ticks_end) - ((int32_t)ticks_start))) / 1000;
-                printf("Download comlete, total time %u s, speed %u Kbps\r\n",
-                        (unsigned int)time_consumed,
-                        (unsigned int)(total / time_consumed * 8 / 1000)
-                );
-                break;
-            }
-        }
-    }
-
-    vPortFree(recv_buffer);
-out:
-    close(sockfd);
-    return 0;
-}
-
-static void http_test_cmd(char *buf, int len, int argc, char **argv)
-{
-    // http://nf.cr.dandanman.com/ddm/ContentResource/music/204.mp3
-    client_demo("nf.cr.dandanman.com");
-}
-
-static void cb_httpc_result(void *arg, httpc_result_t httpc_result, u32_t rx_content_len, u32_t srv_res, err_t err)
-{
-    httpc_state_t **req = (httpc_state_t**)arg;
-
-    printf("[HTTPC] Transfer finished. rx_content_len is %lu\r\n", rx_content_len);
-    *req = NULL;
-}
-
-err_t cb_httpc_headers_done_fn(httpc_state_t *connection, void *arg, struct pbuf *hdr, u16_t hdr_len, u32_t content_len)
-{
-    printf("[HTTPC] hdr_len is %u, content_len is %lu\r\n", hdr_len, content_len);
-    return ERR_OK;
-}
-
-static err_t cb_altcp_recv_fn(void *arg, struct altcp_pcb *conn, struct pbuf *p, err_t err)
-{
-    //printf("[HTTPC] Received %u Bytes\r\n", p->tot_len);
-    static int count = 0;
-
-    puts(".");
-    if (0 == ((count++) & 0x3F)) {
-        puts("\r\n");
-    }
-    altcp_recved(conn, p->tot_len);
-    pbuf_free(p);
-
-    return ERR_OK;
-}
-
-static void cmd_httpc_test(char *buf, int len, int argc, char **argv)
-{
-    static httpc_connection_t settings;
-    static httpc_state_t *req;
-
-    if (req) {
-        printf("[CLI] req is on-going...\r\n");
-        return;
-    }
-    memset(&settings, 0, sizeof(settings));
-    settings.use_proxy = 0;
-    settings.result_fn = cb_httpc_result;
-    settings.headers_done_fn = cb_httpc_headers_done_fn;
-
-    httpc_get_file_dns(
-            "nf.cr.dandanman.com",
-            80,
-            "/ddm/ContentResource/music/204.mp3",
-            &settings,
-            cb_altcp_recv_fn,
-            &req,
-            &req
-   );
-}
-
 static void cmd_stack_wifi(char *buf, int len, int argc, char **argv)
 {
     /*wifi fw stack and thread stuff*/
@@ -1268,47 +982,6 @@ static void cmd_stack_wifi(char *buf, int len, int argc, char **argv)
     printf("Start Wi-Fi fw is Done @%lums\r\n", bl_timer_now_us()/1000);
     aos_post_event(EV_WIFI, CODE_WIFI_ON_INIT_DONE, 0);
 
-}
-
-const static struct cli_command cmds_user[] STATIC_CLI_CMD_ATTRIBUTE = {
-        { "aws", "aws iot demo", cmd_aws},
-        { "pka", "pka iot demo", cmd_pka},
-        { "wifi", "wifi", cmd_wifi},
-        { "sha", "sha iot demo", cmd_sha},
-        { "trng", "trng test", cmd_trng},
-        { "aes", "trng test", cmd_aes},
-        { "cks", "cks test", cmd_cks},
-        { "dma", "dma test", cmd_dma},
-        { "exception_load", "exception load test", cmd_exception_load},
-        { "exception_l_illegal", "exception load test", cmd_exception_l_illegal},
-        { "exception_store", "exception store test", cmd_exception_store},
-        { "exception_inst_illegal", "exception illegal instruction", cmd_exception_illegal_ins},
-        /*Stack Command*/
-        { "stack_wifi", "Wi-Fi Stack", cmd_stack_wifi},
-        /*TCP/IP network test*/
-        {"http", "http client download test based on socket", http_test_cmd},
-        {"httpc", "http client download test based on RAW TCP", cmd_httpc_test},
-};
-
-static void _cli_init()
-{
-    /*Put CLI which needs to be init here*/
-int codex_debug_cli_init(void);
-    codex_debug_cli_init();
-    easyflash_cli_init();
-    network_netutils_iperf_cli_register();
-    network_netutils_tcpserver_cli_register();
-    network_netutils_tcpclinet_cli_register();
-    network_netutils_netstat_cli_register();
-    network_netutils_ping_cli_register();
-    sntp_cli_init();
-    bl_sys_time_cli_init();
-    bl_sys_ota_cli_init();
-    blfdt_cli_init();
-    wifi_mgmr_cli_init();
-    bl_wdt_cli_init();
-    bl_gpio_cli_init();
-    looprt_test_cli_init();
 }
 
 static int get_dts_addr(const char *name, uint32_t *start, uint32_t *off)
@@ -1333,16 +1006,9 @@ static int get_dts_addr(const char *name, uint32_t *start, uint32_t *off)
     return 0;
 }
 
-// static void __opt_feature_init(void)
-// {
-// #ifdef CONF_USER_ENABLE_VFS_ROMFS
-//     romfs_register();
-// #endif
-// }
 
-static void aos_loop_proc(void *pvParameters)
+static void event_loop(void *pvParameters)
 {
-    int fd_console;
     uint32_t fdt = 0, offset = 0;
     static StackType_t proc_stack_looprt[512];
     static StaticTask_t proc_task_looprt;
@@ -1355,28 +1021,15 @@ static void aos_loop_proc(void *pvParameters)
     vfs_init();
     vfs_device_init();
 
-    /* uart */
-#if 1
+    
     if (0 == get_dts_addr("uart", &fdt, &offset)) {
         vfs_uart_init(fdt, offset);
     }
-#else
-    vfs_uart_init_simple_mode(0, 7, 16, 2 * 1000 * 1000, "/dev/ttyS0");
-#endif
     if (0 == get_dts_addr("gpio", &fdt, &offset)) {
         hal_gpio_init_from_dts(fdt, offset);
     }
 
-    // __opt_feature_init();
     aos_loop_init();
-
-    fd_console = aos_open("/dev/ttyS0", 0);
-    if (fd_console >= 0) {
-        printf("Init CLI with event Driven\r\n");
-        aos_cli_init(0);
-        aos_poll_read_fd(fd_console, aos_cli_event_cb_read_get(), (void*)0x12345678);
-        _cli_init();
-    }
 
     aos_register_event_filter(EV_WIFI, event_cb_wifi_event, NULL);
     cmd_stack_wifi(NULL, 0, 0, NULL);
@@ -1391,7 +1044,6 @@ static void aos_loop_proc(void *pvParameters)
     }
 
     aos_loop_run();
-
     puts("------------------------------------------\r\n");
     puts("+++++++++Critical Exit From Loop++++++++++\r\n");
     puts("******************************************\r\n");
@@ -1453,71 +1105,28 @@ void vAssertCalled(void)
     }
 }
 
-// static void _dump_boot_info(void)
-// {
-//     char chip_feature[40];
-//     const char *banner;
-
-//     puts("Booting BL602 Chip...\r\n");
-
-//     /*Display Banner*/
-//     if (0 == bl_chip_banner(&banner)) {
-//         puts(banner);
-//     }
-//     puts("\r\n");
-//     /*Chip Feature list*/
-//     puts("\r\n");
-//     puts("------------------------------------------------------------\r\n");
-//     puts("RISC-V Core Feature:");
-//     bl_chip_info(chip_feature);
-//     puts(chip_feature);
-//     puts("\r\n");
-
-//     puts("Build Version: ");
-//     puts(BL_SDK_VER); // @suppress("Symbol is not resolved")
-//     puts("\r\n");
-
-//     puts("PHY   Version: ");
-//     puts(BL_SDK_PHY_VER); // @suppress("Symbol is not resolved")
-//     puts("\r\n");
-
-//     puts("RF    Version: ");
-//     puts(BL_SDK_RF_VER); // @suppress("Symbol is not resolved")
-//     puts("\r\n");
-
-//     puts("Build Date: ");
-//     puts(__DATE__);
-//     puts("\r\n");
-
-//     puts("Build Time: ");
-//     puts(__TIME__);
-//     puts("\r\n");
-//     puts("------------------------------------------------------------\r\n");
-
-// }
-
 static void system_init(void)
 {
+    vPortDefineHeapRegions(xHeapRegions);
+    printf("Heap %u@%p, %u@%p\r\n",
+            (unsigned int)&_heap_size, &_heap_start,
+            (unsigned int)&_heap_wifi_size, &_heap_wifi_start
+    );
     blog_init();
     bl_irq_init();
     bl_sec_init();
     bl_sec_test();
     bl_dma_init();
     hal_boot2_init();
-
     /* board config is set after system is init*/
     hal_board_cfg(0);
-}
+    tcpip_init(NULL, NULL);
 
-static void system_thread_init()
-{
-    /*nothing here*/
 }
 
 int timeout = 1000;
 
 static char* get_saved_ssid() {
-    // size_t content_len = 0;
     struct env_node_obj info_obj;
     if (!ef_get_env_obj(WIFI_SSID_KEY, &info_obj)) return NULL;
     printf("SSID length: %d\n", info_obj.value_len);
@@ -1528,28 +1137,12 @@ static char* get_saved_ssid() {
 }
 
 static char* get_saved_pass() {
-    // size_t content_len = 0;
     struct env_node_obj info_obj;
     if (!ef_get_env_obj(WIFI_PASS_KEY, &info_obj)) return NULL;
     if(info_obj.value_len <= 0) return NULL;
     char* pass = malloc(info_obj.value_len);
     ef_get_env_blob(WIFI_PASS_KEY, pass, info_obj.value_len, NULL);
     return pass;
-}
-
-static bool connect_to_wifi(char* ssid, char* pass) {
-    // int ret;
-    // if ((ret = aos_post_event(EV_WIFI, CODE_WIFI_ON_PROV_SSID, (unsigned long) ssid)) < 0) {
-    //     printf("[APP] [PROV] trigger SSID event failed, ret %d\r\n", ret);
-    //     return false;
-    // } 
-    // if ((ret = aos_post_event(EV_WIFI, CODE_WIFI_ON_PROV_PASSWD, (unsigned long) pass)) < 0) {
-    //     printf("[APP] [PROV] trigger PASSWD event failed, ret %d\r\n", ret);
-    //     return false;
-    // }
-    // return aos_post_event(EV_WIFI, CODE_WIFI_ON_PROV_CONNECT, 0) >= 0;
-    wifi_sta_connect(ssid, pass);
-    return true;
 }
 
 static void custom_task_func(void *pvParameters) {
@@ -1563,7 +1156,7 @@ static void custom_task_func(void *pvParameters) {
             printf("PASS: %s\r\n", pass);
             if (ssid != NULL && pass != NULL) {
                 puts("Connecting to wifi...");
-                connect_to_wifi(ssid, pass);
+                wifi_sta_connect(ssid, pass);
             }
             else {
                 if(ssid != NULL) free(ssid);
@@ -1582,38 +1175,21 @@ static void custom_task_func(void *pvParameters) {
 
 void bfl_main()
 {
-    static StackType_t aos_loop_proc_stack[1024];
-    static StaticTask_t aos_loop_proc_task;
-    static StackType_t proc_hellow_stack[512];
-    static StaticTask_t proc_hellow_task;
+    static StackType_t event_loop_stack[2048];
+    static StaticTask_t event_loop_task;
     static StackType_t custom_task_stack[512];
     static StaticTask_t custom_task;
     
     time_main = bl_timer_now_us();
-    /*Init UART In the first place*/
+    
     bl_uart_init(0, 16, 7, 255, 255, 2 * 1000 * 1000);
-    puts("Starting firmware now....\r\n");
-
-    // _dump_boot_info();
-
-    vPortDefineHeapRegions(xHeapRegions);
-    printf("Heap %u@%p, %u@%p\r\n",
-            (unsigned int)&_heap_size, &_heap_start,
-            (unsigned int)&_heap_wifi_size, &_heap_wifi_start
-    );
     printf("Boot2 consumed %lums\r\n", time_main / 1000);
-
+    puts("Starting firmware now....\r\n");
     system_init();
-    system_thread_init();
-
-    // puts("[OS] Added proc_hellow_entry task\r\n");
-    // xTaskCreateStatic(proc_hellow_entry, (char*)"hellow", 512, NULL, 15, proc_hellow_stack, &proc_hellow_task);
-    xTaskCreateStatic(aos_loop_proc, (char*)"event_loop", 1024, NULL, 15, aos_loop_proc_stack, &aos_loop_proc_task);
-    puts("[OS] Added aos_loop_proc task\r\n");
+    // Tasks
+    xTaskCreateStatic(event_loop, (char*)"event_loop", 1024, NULL, 15, event_loop_stack, &event_loop_task);
+    puts("[OS] Added event_loop task\r\n");
     xTaskCreateStatic(custom_task_func, (char*)"custom_task", 512, NULL, 15, custom_task_stack, &custom_task);
-    puts("[OS] Starting TCP/IP Stack...\r\n");
-    tcpip_init(NULL, NULL);
-
     puts("[OS] Starting OS Scheduler...\r\n");
     vTaskStartScheduler();
 }
