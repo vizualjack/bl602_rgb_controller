@@ -43,6 +43,7 @@ const char *html_page = "\
     </style>\
 </head>\
 <body>\
+    <span>v0.0.18</span>\
     <div class=\"container\">\
         <h1>Firmware Upload</h1>\
         <form id=\"uploadForm\" action=\"/ota\" method=\"POST\" enctype=\"multipart/form-data\">\
@@ -71,21 +72,11 @@ const char *html_page = "\
         <form id=\"pwm-start\" action=\"/pwm_start\" method=\"POST\" enctype=\"multipart/form-data\">\
             <label for=\"pin\">Pin:</label>\
             <input type=\"number\" id=\"pin\" name=\"pin\" required/>\
+            <input type=\"number\" id=\"duty\" name=\"duty\" required/>\
             <button type=\"submit\">Start</button>\
         </form>\
     </div>\
 \
-    \
-    <div class=\"container\">\
-        <h1>PWM edit duty</h1>\
-        <form id=\"pwm-edit\" action=\"/pwm_edit_duty\" method=\"POST\" enctype=\"multipart/form-data\">\
-            <label for=\"duty\">Duty:</label>\
-            <input type=\"number\" id=\"duty\" name=\"duty\" required/>\
-            <button type=\"submit\">Edit</button>\
-        </form>\
-    </div>\
-\
-    \
     <div class=\"container\">\
         <h1>PWM stop duty</h1>\
         <form id=\"pwm-stop\" action=\"/pwm_stop\" method=\"POST\" enctype=\"multipart/form-data\">\

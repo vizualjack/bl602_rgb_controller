@@ -87,6 +87,7 @@
 #include "lwip/api.h"
 #include "page.h"
 #include "bl_pwm.h"
+#include "hal_pwm.h"
 
 #define mainHELLO_TASK_PRIORITY     ( 20 )
 #define UART_ID_2 (2)
@@ -465,9 +466,9 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
 
 	activeID = hal_boot2_get_active_partition();
 
-	printf("Starting OTA test. OTA bin addr is %p, incoming len %i\r\n", recv_buffer, writelen);
+	// printf("Starting OTA test. OTA bin addr is %p, incoming len %i\r\n", recv_buffer, writelen);
 
-	printf("[OTA] [TEST] activeID is %u\r\n", activeID);
+	// printf("[OTA] [TEST] activeID is %u\r\n", activeID);
 
 	if(hal_boot2_get_active_entries(BOOT2_PARTITION_TYPE_FW, &ptEntry))
 	{
@@ -487,7 +488,7 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
 	 * serveral pieces. Partition size vs bin_size check is also needed
 	 */
 
-	printf("Starting OTA test. OTA size is %lu\r\n", bin_size);
+	// printf("Starting OTA test. OTA size is %lu\r\n", bin_size);
 
     if(content_length >= bin_size)
     {
@@ -496,9 +497,9 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
         // return http_rest_error(request, -20, "Too large bin");
     }
 
-	printf("[OTA] [TEST] activeIndex is %u, use OTA address=%08x\r\n", ptEntry.activeIndex, (unsigned int)ota_addr);
+	// printf("[OTA] [TEST] activeIndex is %u, use OTA address=%08x\r\n", ptEntry.activeIndex, (unsigned int)ota_addr);
 
-	printf("[OTA] [TEST] Erase flash with size %lu...\r\n", bin_size);
+	printf("[OTA] Erasing flash (%lu)...\r\n", bin_size);
 	hal_update_mfg_ptable();
 
 	// Erase in chunks, because erasing everything at once is slow and causes issues with http connection
@@ -513,11 +514,11 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
 			erase_len = 0x10000; //Erase in 64kb chunks
 		}
 		bl_mtd_erase(handle, erase_offset, erase_len);
-		printf("[OTA] Erased:  %lu / %lu \r\n", erase_offset, erase_len);
+		// printf("[OTA] Erased:  %lu / %lu \r\n", erase_offset, erase_len);
 		erase_offset += erase_len;
 		// rtos_delay_milliseconds(100);
 	}
-	printf("[OTA] Done\r\n");
+	printf("[OTA] Flash erased\r\n");
     // === ERASING ===
 
 
@@ -527,6 +528,7 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
     
     
     
+	printf("[OTA] Flashing new firmware\r\n");
     struct netbuf *inbuf;
     char *buf;
     u16_t buflen;
@@ -552,19 +554,19 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
                 buf += 4; // Skip past "\r\n\r\n"
                 first = false;
                 buflen -= (buf - before);
-                printf("Found start, skipping %td bytes\r\n", buf - before);
+                printf("[OTA] Found data start, skipping %td bytes\r\n", buf - before);
             }
             data_end = strstr(buf, "\r\n------");
             if(data_end != NULL) {
                 buflen = (data_end - buf);
-                printf("Found end, last frame total bytes are %td\r\n", data_end - buf);
+                printf("[OTA] Found data end, last frame total bytes are %td\r\n", data_end - buf);
             }
             bl_mtd_write(handle, flash_offset, buflen, (u_int8_t*)buf);
             flash_offset += buflen;
             total += buflen;
-            printf("Flash takes %i\r\n", buflen);
-            printf("remaining %i\r\n", remaining);
-            printf("total %i\r\n", total);
+            // printf("Flash takes %i\r\n", buflen);
+            // printf("remaining %i\r\n", remaining);
+            // printf("total %i\r\n", total);
             netbuf_delete(inbuf);
         } else {
             puts("Error receiving additional data\n");
@@ -573,6 +575,7 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
             return ERR_CLSD;
         }
     }
+	printf("[OTA] Flashed new firmware\r\n");
     // flash write logic
 	// buffer_offset = 0;
 	// flash_offset = 0;
@@ -598,11 +601,12 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
 
 	// } while((towrite > 0) && (writelen >= 0));
     // ==== flash write logic ====
-	printf("[OTA] [TCP] prepare OTA partition info\r\n");
+	printf("[OTA] set OTA partition length\r\n");
 	ptEntry.len = total;
-	printf("[OTA] [TCP] Update PARTITION, partition len is %lu\r\n", ptEntry.len);
+	// printf("[OTA] [TCP] Update PARTITION, partition len is %lu\r\n", ptEntry.len);
 	hal_boot2_update_ptable(&ptEntry);
-	puts("[OTA] [TCP] Rebooting\r\n");
+	puts("[OTA] Rebooting...\r\n");
+    sys_msleep(500);
 	vPortFree(recv_buffer);
 	bl_mtd_close(handle);
     hal_reboot();
@@ -659,11 +663,15 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
 
 #define MAX_BUFFER_SIZE 1024
 
+// 0   1   3  4
+// 20  21  3  4
+const int pwm_to_pin[4][2] = {{0,20},{1,21},{3,3},{4,4}};
+const int map[] = {0,1,2,3};
+
 err_t httpd_handler(struct netconn *conn) {
     struct netbuf *inbuf;
     char *buf;
     u16_t buflen;
-    static int id = 0;
     static int pin = 0;
 
     // Receive HTTP request
@@ -757,67 +765,74 @@ err_t httpd_handler(struct netconn *conn) {
                 printf("[httpd_handler] body: %s\r\n", body);
                 char* start = strstr(body, "name=\"pin\"\r\n\r\n");
                 start += 14;
-                int value = atoi(start);
-                printf("[httpd_handler] pwm pin: %d\r\n", value);
-                char* end = strstr(start, "\r\n------");
-                bl_pwm_init(id, value, 60000);
-                bl_pwm_set_duty(id, 0);
-                bl_pwm_start(id);
+                int pin = atoi(start);
+                printf("[httpd_handler] pwm pin: %d\r\n", pin);
+                start = strstr(body, "name=\"duty\"\r\n\r\n");
+                start += 15;
+                int duty = atoi(start);
+                float duty_as_float = (float)duty;
+                // char* end;
+                // float duty = strtof(start, &end);
+                // if(end == start) {
+                //     puts("Can't convert to float\r\n");
+                // } else {
+                    printf("[httpd_handler] pwm duty: %d\r\n", duty);
+                    printf("[httpd_handler] pwm duty as float: %f\r\n", duty_as_float);
+                    printf("[httpd_handler] pwm pin id: %d\r\n", pin);
+                    // printf("[httpd_handler] prev pvm start success: %s\r\n", bl_pwm_start(id) == 0 ? "true" : "false");
+                    // bl_pwm_stop(id);
+                    int id = pwm_to_pin[pin][0];
+                    bl_pwm_set_duty(id, duty);
+                // }
                 netbuf_delete(inbuf);
-                pin = value;
             }  
             else if (strncmp(buf, "POST /pwm_edit_duty", 19) == 0) {
-                puts("[httpd_handler] Edit duty\n");
-                char* body = malloc(content_length + 1);
-                char* body_start = strstr(buf, "\r\n\r\n");
-                body_start += 4;
-                char* body_end = buf + buflen;
-                int total_length = body_end - body_start;
-                printf("Total length: %i\r\n", total_length);
-                memcpy(body, body_start, total_length);
-                netbuf_delete(inbuf);
-                if (netconn_recv(conn, &inbuf) == ERR_OK) {
-                    puts("Got additional data\r\n");
-                    netbuf_data(inbuf, (void **)&buf, &buflen);
-                    printf("Additional data length: %i\r\n", buflen);
-                    memcpy(body + total_length, buf, buflen);
-                }
-                body[content_length] = '\0';
-                printf("[httpd_handler] body: %s\r\n", body);
-                char* start = strstr(body, "name=\"duty\"\r\n\r\n");
-                start += 15;
-                int value = atoi(start);
-                printf("[httpd_handler] pwm duty: %d\r\n", value);
-                char* end = strstr(start, "\r\n------");
-                bl_pwm_stop(id);
-                bl_pwm_init(id, pin, 60000);
-                bl_pwm_set_duty(id, value);
-                bl_pwm_start(id);
-                netbuf_delete(inbuf);
+                // puts("[httpd_handler] Edit duty\n");
+                // char* body = malloc(content_length + 1);
+                // char* body_start = strstr(buf, "\r\n\r\n");
+                // body_start += 4;
+                // char* body_end = buf + buflen;
+                // int total_length = body_end - body_start;
+                // printf("Total length: %i\r\n", total_length);
+                // memcpy(body, body_start, total_length);
+                // netbuf_delete(inbuf);
+                // if (netconn_recv(conn, &inbuf) == ERR_OK) {
+                //     puts("Got additional data\r\n");
+                //     netbuf_data(inbuf, (void **)&buf, &buflen);
+                //     printf("Additional data length: %i\r\n", buflen);
+                //     memcpy(body + total_length, buf, buflen);
+                // }
+                // body[content_length] = '\0';
+                // printf("[httpd_handler] body: %s\r\n", body);
+                // char* end = strstr(start, "\r\n------");
+                // bl_pwm_stop(id);
+                // bl_pwm_init(id, pin, 60000);
+                // bl_pwm_set_duty(id, value);
+                // bl_pwm_start(id);
+                // netbuf_delete(inbuf);
             }  
             else if (strncmp(buf, "POST /pwm_stop", 14) == 0) {
                 puts("[httpd_handler] Stopping pwm\n");
-                bl_pwm_stop(id);
+                // bl_pwm_stop(id);
                 netbuf_delete(inbuf);
             } 
-            // else if (strncmp(buf, "POST /stop", 10) == 0) {
-            //     // puts("[httpd_handler] Stoping pwm on pin 3...\n");
-            //     // uint8_t pin = 3;
-            //     // uint8_t id = 0;
-            //     // bl_pwm_init(id, pin, 60000);
-            //     // bl_pwm_set_duty(id, 25);
-            //     // bl_pwm_start(id);
-            //     // pin = 4;
-            //     // id = 1;
-            //     // bl_pwm_init(id, pin, 60000);
-            //     // bl_pwm_set_duty(id, 25);
-            //     // bl_pwm_start(id);
-            //     // pin = 21;
-            //     // id = 2;
-            //     // bl_pwm_init(id, pin, 60000);
-            //     // bl_pwm_set_duty(id, 25);
-            //     // bl_pwm_start(id);
-            //     // puts("[httpd_handler] Stopped pwm on pin 3\n");
+            // else if (strncmp(buf, "POST /test", 10) == 0) {
+            //     puts("[httpd_handler] Pwm spam...\n");
+            //     uint8_t pin = 3;
+            //     uint8_t id = 0;
+            //     bl_pwm_init(id, pin, 60000);
+            //     bl_pwm_set_duty(id, 25);
+            //     bl_pwm_start(id);
+            //     pin = 4;
+            //     id = 1;
+            //     bl_pwm_init(id, pin, 60000);
+            //     bl_pwm_set_duty(id, 25);
+            //     bl_pwm_start(id);
+            //     pin = 21;
+            //     id = 2;
+            //     bl_pwm_init(id, pin, 60000);
+            //     bl_pwm_set_duty(id, 25);
+            //     bl_pwm_start(id);
             //     netbuf_delete(inbuf);
             // } 
             else netbuf_delete(inbuf);
@@ -1366,6 +1381,15 @@ static void aos_loop_proc(void *pvParameters)
     aos_register_event_filter(EV_WIFI, event_cb_wifi_event, NULL);
     cmd_stack_wifi(NULL, 0, 0, NULL);
     finished_init = true;
+
+    for(int i = 0; i < 4; i++) {
+        int id = pwm_to_pin[i][0];
+        int pin = pwm_to_pin[i][1];
+        bl_pwm_init(id, pin, 60000);
+        bl_pwm_start(id);
+        bl_pwm_set_duty(id, 0);
+    }
+
     aos_loop_run();
 
     puts("------------------------------------------\r\n");
