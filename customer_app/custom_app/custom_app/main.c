@@ -506,7 +506,7 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
 		bl_mtd_erase(handle, erase_offset, erase_len);
 		// printf("[OTA] Erased:  %lu / %lu \r\n", erase_offset, erase_len);
 		erase_offset += erase_len;
-		// rtos_delay_milliseconds(100);
+        sys_msleep(100);
 	}
 	printf("[OTA] Flash erased\r\n");
     // === ERASING ===
@@ -543,8 +543,14 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
                 buf = strstr(buf, "\r\n\r\n");
                 buf += 4; // Skip past "\r\n\r\n"
                 first = false;
-                buflen -= (buf - before);
-                printf("[OTA] Found data start, skipping %td bytes\r\n", buf - before);
+                int skipped_bytes = buf - before;
+                if(skipped_bytes <= 0) {
+                    puts("Something is totally wrong\r\n");
+                    netbuf_delete(inbuf);
+                    return ERR_ARG;
+                }
+                buflen -= skipped_bytes;
+                printf("[OTA] Found data start, skipping %td bytes\r\n", skipped_bytes);
             }
             data_end = strstr(buf, "\r\n------");
             if(data_end != NULL) {
