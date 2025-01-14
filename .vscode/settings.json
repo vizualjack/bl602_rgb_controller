@@ -67,6 +67,7 @@
         "err.h": "c",
         "api.h": "c",
         "*.def": "c",
-        "cstring": "c"
+        "cstring": "c",
+        "rope": "c"
     }
 }

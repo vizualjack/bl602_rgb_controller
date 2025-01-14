@@ -247,6 +247,16 @@ static int http_rest_post_wifi(char* buf) {
     return ERR_OK;
 }
 
+int get_color_value_from_json(const char* json, char color_key) {
+    char search_key[4];
+    int val;
+    snprintf(search_key, sizeof(search_key), "\"%c\":", color_key);
+    char* value_start = strstr(json, search_key);
+    if (value_start == NULL) return -1;
+    sscanf(value_start + 4, "%d", &val);
+    return val;
+}
+
 err_t httpd_handler(struct netconn *conn) {
     struct netbuf *inbuf;
     char *buf;
@@ -375,9 +385,11 @@ err_t httpd_handler(struct netconn *conn) {
                     if(color == 'b') color_to_channel_pin_map[2] = i;
                     if(color == 'w') color_to_channel_pin_map[3] = i;
                 }
+                printf("Colors:  %s\r\n", colors);
+                printf("Mapping: %i%i%i%i\r\n", color_to_channel_pin_map[0], color_to_channel_pin_map[1], color_to_channel_pin_map[2], color_to_channel_pin_map[3]);
                 netbuf_delete(inbuf);
             }
-            else if (strncmp(buf, "POST /new_duty", 17) == 0) {
+            else if (strncmp(buf, "POST /new_duty", 14) == 0) {
                 char* body = malloc(content_length + 1);
                 char* body_start = strstr(buf, "\r\n\r\n");
                 body_start += 4;
@@ -385,35 +397,15 @@ err_t httpd_handler(struct netconn *conn) {
                 int total_length = body_end - body_start;
                 printf("Total length: %i\r\n", total_length);
                 memcpy(body, body_start, total_length);
-                // netbuf_delete(inbuf);
-                // if (netconn_recv(conn, &inbuf) == ERR_OK) {
-                //     puts("Got additional data\r\n");
-                //     netbuf_data(inbuf, (void **)&buf, &buflen);
-                //     printf("Additional data length: %i\r\n", buflen);
-                //     memcpy(body + total_length, buf, buflen);
-                // }
                 body[content_length] = '\0';
                 printf("Body: %s\r\n", body);
-                // char colors[5] = {'-', '-', '-', '-', '\0'};
-                // char* start = strstr(body, "name=\"p0\"\r\n\r\n");
-                // start += 13;
-                // if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[0] = start[0];
-                // start = strstr(body, "name=\"p1\"\r\n\r\n");
-                // start += 13;
-                // if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[1] = start[0];
-                // start = strstr(body, "name=\"p2\"\r\n\r\n");
-                // start += 13;
-                // if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[2] = start[0];
-                // start = strstr(body, "name=\"p3\"\r\n\r\n");
-                // start += 13;
-                // if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[3] = start[0];
-                // for(int i = 0; i < 4; i++) {
-                //     char color = colors[i];
-                //     if(color == 'r') color_to_channel_pin_map[0] = i;
-                //     if(color == 'g') color_to_channel_pin_map[1] = i;
-                //     if(color == 'b') color_to_channel_pin_map[2] = i;
-                //     if(color == 'w') color_to_channel_pin_map[3] = i;
-                // }
+                int r, g, b, w;
+                r = get_color_value_from_json(body, 'r');
+                g = get_color_value_from_json(body, 'g');
+                b = get_color_value_from_json(body, 'b');
+                w = get_color_value_from_json(body, 'w');
+                printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
+                set_rgbw_duty(r, g, b, w);
                 netbuf_delete(inbuf);
             }
             else if (strncmp(buf, "POST /reboot", 12) == 0) {
