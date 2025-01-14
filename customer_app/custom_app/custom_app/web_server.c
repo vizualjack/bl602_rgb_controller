@@ -396,7 +396,17 @@ err_t httpd_handler(struct netconn *conn) {
                 char* body_end = buf + buflen;
                 int total_length = body_end - body_start;
                 printf("Total length: %i\r\n", total_length);
-                memcpy(body, body_start, total_length);
+                if(total_length > 0) memcpy(body, body_start, total_length);
+                netbuf_delete(inbuf);
+                if (total_length == 0) {
+                    if (netconn_recv(conn, &inbuf) == ERR_OK) {
+                        puts("Got additional data\r\n");
+                        netbuf_data(inbuf, (void **)&buf, &buflen);
+                        printf("Additional data length: %i\r\n", buflen);
+                        memcpy(body + total_length, buf, buflen);
+                        netbuf_delete(inbuf);
+                    }
+                }
                 body[content_length] = '\0';
                 printf("Body: %s\r\n", body);
                 int r, g, b, w;
@@ -406,7 +416,6 @@ err_t httpd_handler(struct netconn *conn) {
                 w = get_color_value_from_json(body, 'w');
                 printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
                 set_rgbw_duty(r, g, b, w);
-                netbuf_delete(inbuf);
             }
             else if (strncmp(buf, "POST /reboot", 12) == 0) {
                 puts("[httpd_handler] Rebooting...\n");
