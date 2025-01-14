@@ -88,6 +88,8 @@
 #include "page.h"
 #include "bl_pwm.h"
 #include "hal_pwm.h"
+#include "main.h"
+#include "custom_task.h"
 
 #define mainHELLO_TASK_PRIORITY     ( 20 )
 #define UART_ID_2 (2)
@@ -126,12 +128,9 @@ static HeapRegion_t xHeapRegions[] =
         { NULL, 0 }, /* Terminates the array. */
         { NULL, 0 } /* Terminates the array. */
 };
-static wifi_interface_t wifi_interface;
-
-
+// static wifi_interface_t wifi_interface;
 bool finished_init = false;
-static char* WIFI_SSID_KEY = "wifi_ssid";
-static char* WIFI_PASS_KEY = "wifi_pass";
+
 
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName )
 {
@@ -164,69 +163,69 @@ void vApplicationIdleHook(void)
 #endif
 }
 
-static unsigned char char_to_hex(char asccode)
-{
-    unsigned char ret;
+// static unsigned char char_to_hex(char asccode)
+// {
+//     unsigned char ret;
 
-    if('0'<=asccode && asccode<='9')
-        ret=asccode-'0';
-    else if('a'<=asccode && asccode<='f')
-        ret=asccode-'a'+10;
-    else if('A'<=asccode && asccode<='F')
-        ret=asccode-'A'+10;
-    else
-        ret=0;
+//     if('0'<=asccode && asccode<='9')
+//         ret=asccode-'0';
+//     else if('a'<=asccode && asccode<='f')
+//         ret=asccode-'a'+10;
+//     else if('A'<=asccode && asccode<='F')
+//         ret=asccode-'A'+10;
+//     else
+//         ret=0;
 
-    return ret;
-}
+//     return ret;
+// }
 
-static void _chan_str_to_hex(uint8_t *chan_band, uint16_t *chan_freq, char *chan)
-{
-    int i, freq_len, base=1;
-    uint8_t band;
-    uint16_t freq = 0;
-    char *p, *q;
+// static void _chan_str_to_hex(uint8_t *chan_band, uint16_t *chan_freq, char *chan)
+// {
+//     int i, freq_len, base=1;
+//     uint8_t band;
+//     uint16_t freq = 0;
+//     char *p, *q;
 
-    /*should have the following format
-     * 2412|0
-     * */
-    p = strchr(chan, '|') + 1;
-    if (NULL == p) {
-        return;
-    }
-    band = char_to_hex(p[0]);
-    (*chan_band) = band;
+//     /*should have the following format
+//      * 2412|0
+//      * */
+//     p = strchr(chan, '|') + 1;
+//     if (NULL == p) {
+//         return;
+//     }
+//     band = char_to_hex(p[0]);
+//     (*chan_band) = band;
 
-    freq_len = strlen(chan) - strlen(p) - 1;
-    q = chan;
-    q[freq_len] = '\0';
-    for (i=0; i< freq_len; i++) {
-       freq = freq + char_to_hex(q[freq_len-1-i]) * base;
-       base = base * 10;
-    }
-    (*chan_freq) = freq;
-}
+//     freq_len = strlen(chan) - strlen(p) - 1;
+//     q = chan;
+//     q[freq_len] = '\0';
+//     for (i=0; i< freq_len; i++) {
+//        freq = freq + char_to_hex(q[freq_len-1-i]) * base;
+//        base = base * 10;
+//     }
+//     (*chan_freq) = freq;
+// }
 
-static void bssid_str_to_mac(uint8_t *hex, char *bssid, int len)
-{
-   unsigned char l4,h4;
-   int i,lenstr;
-   lenstr = len;
+// static void bssid_str_to_mac(uint8_t *hex, char *bssid, int len)
+// {
+//    unsigned char l4,h4;
+//    int i,lenstr;
+//    lenstr = len;
 
-   if(lenstr%2) {
-       lenstr -= (lenstr%2);
-   }
+//    if(lenstr%2) {
+//        lenstr -= (lenstr%2);
+//    }
 
-   if(lenstr==0){
-       return;
-   }
+//    if(lenstr==0){
+//        return;
+//    }
 
-   for(i=0; i < lenstr; i+=2) {
-       h4=char_to_hex(bssid[i]);
-       l4=char_to_hex(bssid[i+1]);
-       hex[i/2]=(h4<<4)+l4;
-   }
-}
+//    for(i=0; i < lenstr; i+=2) {
+//        h4=char_to_hex(bssid[i]);
+//        l4=char_to_hex(bssid[i+1]);
+//        hex[i/2]=(h4<<4)+l4;
+//    }
+// }
 
 int check_dts_config(char ssid[33], char password[64])
 {
@@ -243,15 +242,6 @@ int check_dts_config(char ssid[33], char password[64])
     password[63] = '\0';
 
     return 0;
-}
-
-
-static void connect_wifi(char *ssid, char *password)
-{
-    wifi_interface_t wifi_interface;
-
-    wifi_interface = wifi_mgmr_sta_enable();
-    wifi_mgmr_sta_connect(wifi_interface, ssid, password, NULL, NULL, 0, 0);
 }
 
 static int http_rest_post_wifi(char* buf) {
@@ -302,22 +292,21 @@ static int http_rest_post_wifi(char* buf) {
 #define OTA_PROGRAM_SIZE (512)
 static int http_rest_post_flash(struct netconn *conn, int content_length)
 {
-	int total = 0;
-	int towrite = content_length;
+	// int towrite = content_length;
 	// char* writebuf = max_file_size;
-	int writelen = content_length;
-	int fsize = 0;
+	// int writelen = content_length;
+	// int fsize = 0;
 
 	// ADDLOG_DEBUG(LOG_FEATURE_OTA, "OTA post len %d", request->contentLength);
 
-	int sockfd, i;
+	// int sockfd, i;
 	int ret;
-	struct hostent* hostinfo;
+	// struct hostent* hostinfo;
 	uint8_t* recv_buffer;
-	struct sockaddr_in dest;
+	// struct sockaddr_in dest;
 	// iot_sha256_context ctx;
-	uint8_t sha256_result[32];
-	uint8_t sha256_img[32];
+	// uint8_t sha256_result[32];
+	// uint8_t sha256_img[32];
 	bl_mtd_handle_t handle;
 
 	ret = bl_mtd_open(BL_MTD_PARTITION_NAME_FW_DEFAULT, &handle, BL_MTD_OPEN_FLAG_BACKUP);
@@ -330,7 +319,7 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
 
 	recv_buffer = pvPortMalloc(OTA_PROGRAM_SIZE);
 
-	unsigned int buffer_offset, flash_offset, ota_addr;
+	unsigned int flash_offset, ota_addr;
 	uint32_t bin_size;
 	uint8_t activeID;
 	HALPartition_Entry_Config ptEntry;
@@ -405,6 +394,7 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
     u16_t buflen;
     int remaining = content_length;
     // char *data_start;
+	int total = 0;
     char *data_end;
     bool first = true;
     flash_offset = 0;
@@ -499,7 +489,6 @@ err_t httpd_handler(struct netconn *conn) {
     struct netbuf *inbuf;
     char *buf;
     u16_t buflen;
-    static int pin = 0;
 
     // Receive HTTP request
     if (netconn_recv(conn, &inbuf) == ERR_OK) {
@@ -597,60 +586,17 @@ err_t httpd_handler(struct netconn *conn) {
                 start = strstr(body, "name=\"duty\"\r\n\r\n");
                 start += 15;
                 int duty = atoi(start);
-                float duty_as_float = (float)duty;
                 int id = pwm_to_pin[pin][0];
                 bl_pwm_set_duty(id, duty);
                 netbuf_delete(inbuf);
             }  
             else if (strncmp(buf, "POST /pwm_edit_duty", 19) == 0) {
-                // puts("[httpd_handler] Edit duty\n");
-                // char* body = malloc(content_length + 1);
-                // char* body_start = strstr(buf, "\r\n\r\n");
-                // body_start += 4;
-                // char* body_end = buf + buflen;
-                // int total_length = body_end - body_start;
-                // printf("Total length: %i\r\n", total_length);
-                // memcpy(body, body_start, total_length);
-                // netbuf_delete(inbuf);
-                // if (netconn_recv(conn, &inbuf) == ERR_OK) {
-                //     puts("Got additional data\r\n");
-                //     netbuf_data(inbuf, (void **)&buf, &buflen);
-                //     printf("Additional data length: %i\r\n", buflen);
-                //     memcpy(body + total_length, buf, buflen);
-                // }
-                // body[content_length] = '\0';
-                // printf("[httpd_handler] body: %s\r\n", body);
-                // char* end = strstr(start, "\r\n------");
-                // bl_pwm_stop(id);
-                // bl_pwm_init(id, pin, 60000);
-                // bl_pwm_set_duty(id, value);
-                // bl_pwm_start(id);
-                // netbuf_delete(inbuf);
             }  
             else if (strncmp(buf, "POST /pwm_stop", 14) == 0) {
                 puts("[httpd_handler] Stopping pwm\n");
                 // bl_pwm_stop(id);
                 netbuf_delete(inbuf);
             } 
-            // else if (strncmp(buf, "POST /test", 10) == 0) {
-            //     puts("[httpd_handler] Pwm spam...\n");
-            //     uint8_t pin = 3;
-            //     uint8_t id = 0;
-            //     bl_pwm_init(id, pin, 60000);
-            //     bl_pwm_set_duty(id, 25);
-            //     bl_pwm_start(id);
-            //     pin = 4;
-            //     id = 1;
-            //     bl_pwm_init(id, pin, 60000);
-            //     bl_pwm_set_duty(id, 25);
-            //     bl_pwm_start(id);
-            //     pin = 21;
-            //     id = 2;
-            //     bl_pwm_init(id, pin, 60000);
-            //     bl_pwm_set_duty(id, 25);
-            //     bl_pwm_start(id);
-            //     netbuf_delete(inbuf);
-            // } 
             else netbuf_delete(inbuf);
         } else {
             // Default response (serves an HTML page)
@@ -1005,55 +951,6 @@ static void system_init(void)
     /* board config is set after system is init*/
     hal_board_cfg(0);
     tcpip_init(NULL, NULL);
-}
-
-int timeout = 1000;
-
-static char* get_saved_ssid() {
-    struct env_node_obj info_obj;
-    if (!ef_get_env_obj(WIFI_SSID_KEY, &info_obj)) return NULL;
-    printf("SSID length: %d\n", info_obj.value_len);
-    if(info_obj.value_len <= 0) return NULL;
-    char* ssid = malloc(info_obj.value_len);
-    ef_get_env_blob(WIFI_SSID_KEY, ssid, info_obj.value_len, NULL);
-    return ssid;
-}
-
-static char* get_saved_pass() {
-    struct env_node_obj info_obj;
-    if (!ef_get_env_obj(WIFI_PASS_KEY, &info_obj)) return NULL;
-    if(info_obj.value_len <= 0) return NULL;
-    char* pass = malloc(info_obj.value_len);
-    ef_get_env_blob(WIFI_PASS_KEY, pass, info_obj.value_len, NULL);
-    return pass;
-}
-
-static void custom_task_func(void *pvParameters) {
-    vTaskDelay(1000);
-    while (1) {
-        if(finished_init) {
-            ef_print_env();
-            char* ssid = get_saved_ssid();
-            char* pass = get_saved_pass();
-            printf("SSID: %s\r\n", ssid);
-            printf("PASS: %s\r\n", pass);
-            if (ssid != NULL && pass != NULL) {
-                puts("Connecting to wifi...");
-                connect_wifi(ssid, pass);
-            }
-            else {
-                if(ssid != NULL) free(ssid);
-                if(pass != NULL) free(pass);
-                puts("Starting ap...");
-                wifi_mgmr_ap_start(wifi_mgmr_ap_enable(), "Test this", 0, NULL, 1);
-            }
-            break;
-        }
-        vTaskDelay(3000);
-    }
-    puts("Custom task end");
-    vTaskDelete(NULL);
-
 }
 
 void bfl_main()

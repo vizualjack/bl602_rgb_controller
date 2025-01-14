@@ -6,6 +6,7 @@
 .sync_*
 *.bin*
 *.pack
+**/custom_app/build_counter
 
 
 # Linux

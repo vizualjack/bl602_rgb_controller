@@ -43,7 +43,7 @@ const char *html_page = "\
     </style>\
 </head>\
 <body>\
-    <span>v0.0.19</span>\
+    <span>Build 48</span>\
     <div class=\"container\">\
         <h1>Firmware Upload</h1>\
         <form id=\"uploadForm\" action=\"/ota\" method=\"POST\" enctype=\"multipart/form-data\">\

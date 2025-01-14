@@ -56,6 +56,10 @@
         "typeinfo": "c",
         "*.tcc": "c",
         "event_device.h": "c",
-        "hal_pwm.h": "c"
+        "hal_pwm.h": "c",
+        "libfdt.h": "c",
+        "looprt.h": "c",
+        "custom_task.h": "c",
+        "main.h": "c"
     }
 }

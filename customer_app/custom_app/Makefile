@@ -11,14 +11,21 @@ export PROJECT_PATH PROJECT_BOARD
 
 HTML = page.html
 HEADER = page.h
+BUILD_COUNTER = build_counter
 HTML_FILE_PATH := $(PROJECT_PATH)/$(PROJECT_NAME)/$(HTML)
 HEADER_FILE_PATH := $(PROJECT_PATH)/$(PROJECT_NAME)/$(HEADER)
+BUILD_COUNTER_PATH := $(PROJECT_PATH)/$(PROJECT_NAME)/$(BUILD_COUNTER)
+PREV_BUILD_COUNTER := $(shell [ -f $(BUILD_COUNTER_PATH) ] && cat $(BUILD_COUNTER_PATH) || echo 0)
+CUR_BUILD_COUNTER = $(shell echo $$(($(PREV_BUILD_COUNTER) + 1)))
 
 
 $(HEADER):
+	$(shell echo $(CUR_BUILD_COUNTER) > $(BUILD_COUNTER_PATH))
+	@echo "Build counter $(CUR_BUILD_COUNTER)"
 	@echo "Generating $(HEADER) from $(HTML)"
 	@echo 'const char *html_page = "\' > $(HEADER_FILE_PATH)
 	@sed 's/"/\\"/g; s/$$/\\/' $(HTML_FILE_PATH) >> $(HEADER_FILE_PATH)
+	@sed -i "s/%BUILD_COUNT%/$(CUR_BUILD_COUNTER)/" $(HEADER_FILE_PATH)
 	@echo '";' >> $(HEADER_FILE_PATH)
 
 -include ./proj_config.mk
