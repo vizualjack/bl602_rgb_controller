@@ -245,127 +245,8 @@ int check_dts_config(char ssid[33], char password[64])
     return 0;
 }
 
-static void _connect_wifi()
-{
-    puts("_connect_wifi IS IN USE");
-    /*XXX caution for BIG STACK*/
-    char pmk[66], bssid[32], chan[10];
-    char ssid[33], password[66];
-    char val_buf[66];
-    char val_len = sizeof(val_buf) - 1;
-    uint8_t mac[6];
-    uint8_t band = 0;
-    uint16_t freq = 0;
 
-    wifi_interface = wifi_mgmr_sta_enable();
-    printf("[APP] [WIFI] [T] %lld\r\n"
-           "[APP]   Get STA %p from Wi-Fi Mgmr, pmk ptr %p, ssid ptr %p, password %p\r\n",
-           aos_now_ms(),
-           wifi_interface,
-           pmk,
-           ssid,
-           password
-    );
-    memset(pmk, 0, sizeof(pmk));
-    memset(ssid, 0, sizeof(ssid));
-    memset(password, 0, sizeof(password));
-    memset(bssid, 0, sizeof(bssid));
-    memset(mac, 0, sizeof(mac));
-    memset(chan, 0, sizeof(chan));
-
-    memset(val_buf, 0, sizeof(val_buf));
-    ef_get_env_blob((const char *)WIFI_AP_PSM_INFO_SSID, val_buf, val_len, NULL);
-    if (val_buf[0]) {
-        /*We believe that when ssid is set, wifi_confi is OK*/
-        strncpy(ssid, val_buf, sizeof(ssid) - 1);
-
-        /*setup password ans PMK stuff from ENV*/
-        memset(val_buf, 0, sizeof(val_buf));
-        ef_get_env_blob((const char *)WIFI_AP_PSM_INFO_PASSWORD, val_buf, val_len, NULL);
-        if (val_buf[0]) {
-            strncpy(password, val_buf, sizeof(password) - 1);
-        }
-
-        memset(val_buf, 0, sizeof(val_buf));
-        ef_get_env_blob((const char *)WIFI_AP_PSM_INFO_PMK, val_buf, val_len, NULL);
-        if (val_buf[0]) {
-            strncpy(pmk, val_buf, sizeof(pmk) - 1);
-        }
-        if (0 == pmk[0]) {
-            printf("[APP] [WIFI] [T] %lld\r\n",
-               aos_now_ms()
-            );
-            puts("[APP]    Re-cal pmk\r\n");
-            /*At lease pmk is not illegal, we re-cal now*/
-            //XXX time consuming API, so consider lower-prirotiy for cal PSK to avoid sound glitch
-            wifi_mgmr_psk_cal(
-                    password,
-                    ssid,
-                    strlen(ssid),
-                    pmk
-            );
-            ef_set_env(WIFI_AP_PSM_INFO_PMK, pmk);
-            ef_save_env();
-        }
-        memset(val_buf, 0, sizeof(val_buf));
-        ef_get_env_blob((const char *)WIFI_AP_PSM_INFO_CHANNEL, val_buf, val_len, NULL);
-        if (val_buf[0]) {
-            strncpy(chan, val_buf, sizeof(chan) - 1);
-            printf("connect wifi channel = %s\r\n", chan);
-            _chan_str_to_hex(&band, &freq, chan);
-        }
-        memset(val_buf, 0, sizeof(val_buf));
-        ef_get_env_blob((const char *)WIFI_AP_PSM_INFO_BSSID, val_buf, val_len, NULL);
-        if (val_buf[0]) {
-            strncpy(bssid, val_buf, sizeof(bssid) - 1);
-            printf("connect wifi bssid = %s\r\n", bssid);
-            bssid_str_to_mac(mac, bssid, strlen(bssid));
-            printf("mac = %02X:%02X:%02X:%02X:%02X:%02X\r\n",
-                    mac[0],
-                    mac[1],
-                    mac[2],
-                    mac[3],
-                    mac[4],
-                    mac[5]
-            );
-        }
-    } else if (0 == check_dts_config(ssid, password)) {
-        /*nothing here*/
-    } else {
-        /*Won't connect, since ssid config is empty*/
-        puts("[APP]    Empty Config\r\n");
-        puts("[APP]    Try to set the following ENV with psm_set command, then reboot\r\n");
-        puts("[APP]    NOTE: " WIFI_AP_PSM_INFO_PMK " MUST be psm_unset when conf is changed\r\n");
-        puts("[APP]    env: " WIFI_AP_PSM_INFO_SSID "\r\n");
-        puts("[APP]    env: " WIFI_AP_PSM_INFO_PASSWORD "\r\n");
-        puts("[APP]    env(optinal): " WIFI_AP_PSM_INFO_PMK "\r\n");
-        return;
-    }
-
-    printf("[APP] [WIFI] [T] %lld\r\n"
-           "[APP]    SSID %s\r\n"
-           "[APP]    SSID len %d\r\n"
-           "[APP]    password %s\r\n"
-           "[APP]    password len %d\r\n"
-           "[APP]    pmk %s\r\n"
-           "[APP]    bssid %s\r\n"
-           "[APP]    channel band %d\r\n"
-           "[APP]    channel freq %d\r\n",
-           aos_now_ms(),
-           ssid,
-           strlen(ssid),
-           password,
-           strlen(password),
-           pmk,
-           bssid,
-           band,
-           freq
-    );
-    //wifi_mgmr_sta_connect(wifi_interface, ssid, pmk, NULL);
-    wifi_mgmr_sta_connect(wifi_interface, ssid, password, pmk, mac, band, freq);
-}
-
-static void wifi_sta_connect(char *ssid, char *password)
+static void connect_wifi(char *ssid, char *password)
 {
     wifi_interface_t wifi_interface;
 
@@ -842,7 +723,6 @@ static void event_cb_wifi_event(input_event_t *event, void *private_data)
         case CODE_WIFI_ON_MGMR_DONE:
         {
             printf("[APP] [EVT] MGMR DONE %lld, now %lums\r\n", aos_now_ms(), bl_timer_now_us()/1000);
-            _connect_wifi();
         }
         break;
         case CODE_WIFI_ON_MGMR_DENOISE:
@@ -940,9 +820,7 @@ static void event_cb_wifi_event(input_event_t *event, void *private_data)
         break;
         case CODE_WIFI_ON_PROV_CONNECT:
         {
-            // printf("[APP] [EVT] [PROV] [CONNECT] %lld\r\n", aos_now_ms());
-            // printf("connecting to %s:%s...\r\n", ssid, password);
-            // wifi_sta_connect(ssid, password);
+            printf("[APP] [EVT] [PROV] [CONNECT] %lld\r\n", aos_now_ms());
         }
         break;
         case CODE_WIFI_ON_PROV_DISCONNECT:
@@ -1127,7 +1005,6 @@ static void system_init(void)
     /* board config is set after system is init*/
     hal_board_cfg(0);
     tcpip_init(NULL, NULL);
-
 }
 
 int timeout = 1000;
@@ -1162,7 +1039,7 @@ static void custom_task_func(void *pvParameters) {
             printf("PASS: %s\r\n", pass);
             if (ssid != NULL && pass != NULL) {
                 puts("Connecting to wifi...");
-                wifi_sta_connect(ssid, pass);
+                connect_wifi(ssid, pass);
             }
             else {
                 if(ssid != NULL) free(ssid);
