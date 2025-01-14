@@ -3,7 +3,7 @@
 #include <easyflash.h>
 #include <wifi_mgmr_ext.h>
 
-#include "custom_task.h"
+#include "connection.h"
 #include "main.h"
 
 static void connect_wifi(char *ssid, char *password)
@@ -32,7 +32,7 @@ static char* get_saved_pass() {
     return pass;
 }
 
-void custom_task_func(void *pvParameters) {
+void handle_connection(void *pvParameters) {
     vTaskDelay(500);
     while (1) {
         if(finished_init) {

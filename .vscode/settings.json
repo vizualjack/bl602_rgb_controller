@@ -60,6 +60,13 @@
         "libfdt.h": "c",
         "looprt.h": "c",
         "custom_task.h": "c",
-        "main.h": "c"
+        "main.h": "c",
+        "timers.h": "c",
+        "freertos.h": "c",
+        "arch.h": "c",
+        "err.h": "c",
+        "api.h": "c",
+        "*.def": "c",
+        "cstring": "c"
     }
 }
