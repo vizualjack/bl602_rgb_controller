@@ -6,7 +6,6 @@
 #include <lwip/err.h>
 #include <string.h>
 #include <hal_sys.h>
-#include <bl_pwm.h>
 
 #include "connection.c"
 #include "page.h"
@@ -324,8 +323,23 @@ err_t httpd_handler(struct netconn *conn) {
                 netbuf_delete(inbuf);
                 free(body);
             }
-            else if (strncmp(buf, "POST /pwm_start", 15) == 0) {
-                puts("[httpd_handler] Starting pwm\n");
+            else if (strncmp(buf, "POST /set_pin_high", 18) == 0 || strncmp(buf, "POST /set_pin_low", 17) == 0) {
+                char* body = malloc(content_length + 1);
+                char* body_start = strstr(buf, "\r\n\r\n");
+                body_start += 4;
+                char* body_end = buf + buflen;
+                int total_length = body_end - body_start;
+                printf("Total length: %i\r\n", total_length);
+                memcpy(body, body_start, total_length);
+                body[content_length] = '\0';
+                char* start = strstr(body, "name=\"pin\"\r\n\r\n");
+                start += 14;
+                int channel_index = atoi(start);
+                bool setHigh = strncmp(buf, "POST /set_pin_high", 18) == 0;
+                set_channel_duty(channel_index, setHigh ? 100 : 0);
+                netbuf_delete(inbuf);
+            }
+            else if (strncmp(buf, "POST /pin_mapping", 17) == 0) {
                 char* body = malloc(content_length + 1);
                 char* body_start = strstr(buf, "\r\n\r\n");
                 body_start += 4;
@@ -341,27 +355,69 @@ err_t httpd_handler(struct netconn *conn) {
                     memcpy(body + total_length, buf, buflen);
                 }
                 body[content_length] = '\0';
-                printf("[httpd_handler] body: %s\r\n", body);
-                char* start = strstr(body, "name=\"pin_id\"\r\n\r\n");
-                start += 14;
-                int pin = atoi(start);
-                printf("[httpd_handler] pwm pin: %d\r\n", pin);
-                start = strstr(body, "name=\"duty\"\r\n\r\n");
-                start += 15;
-                int duty = atoi(start);
-                int id = pwm_to_pin[pin][0];
-                bl_pwm_set_duty(id, duty);
+                char colors[5] = {'-', '-', '-', '-', '\0'};
+                char* start = strstr(body, "name=\"p0\"\r\n\r\n");
+                start += 13;
+                if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[0] = start[0];
+                start = strstr(body, "name=\"p1\"\r\n\r\n");
+                start += 13;
+                if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[1] = start[0];
+                start = strstr(body, "name=\"p2\"\r\n\r\n");
+                start += 13;
+                if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[2] = start[0];
+                start = strstr(body, "name=\"p3\"\r\n\r\n");
+                start += 13;
+                if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[3] = start[0];
+                for(int i = 0; i < 4; i++) {
+                    char color = colors[i];
+                    if(color == 'r') color_to_channel_pin_map[0] = i;
+                    if(color == 'g') color_to_channel_pin_map[1] = i;
+                    if(color == 'b') color_to_channel_pin_map[2] = i;
+                    if(color == 'w') color_to_channel_pin_map[3] = i;
+                }
                 netbuf_delete(inbuf);
-            }  
-            else if (strncmp(buf, "POST /pwm_edit_duty", 19) == 0) {
-            }  
-            else if (strncmp(buf, "POST /pwm_stop", 14) == 0) {
-                puts("[httpd_handler] Stopping pwm\n");
-                // bl_pwm_stop(id);
+            }
+            else if (strncmp(buf, "POST /new_duty", 17) == 0) {
+                char* body = malloc(content_length + 1);
+                char* body_start = strstr(buf, "\r\n\r\n");
+                body_start += 4;
+                char* body_end = buf + buflen;
+                int total_length = body_end - body_start;
+                printf("Total length: %i\r\n", total_length);
+                memcpy(body, body_start, total_length);
+                // netbuf_delete(inbuf);
+                // if (netconn_recv(conn, &inbuf) == ERR_OK) {
+                //     puts("Got additional data\r\n");
+                //     netbuf_data(inbuf, (void **)&buf, &buflen);
+                //     printf("Additional data length: %i\r\n", buflen);
+                //     memcpy(body + total_length, buf, buflen);
+                // }
+                body[content_length] = '\0';
+                printf("Body: %s\r\n", body);
+                // char colors[5] = {'-', '-', '-', '-', '\0'};
+                // char* start = strstr(body, "name=\"p0\"\r\n\r\n");
+                // start += 13;
+                // if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[0] = start[0];
+                // start = strstr(body, "name=\"p1\"\r\n\r\n");
+                // start += 13;
+                // if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[1] = start[0];
+                // start = strstr(body, "name=\"p2\"\r\n\r\n");
+                // start += 13;
+                // if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[2] = start[0];
+                // start = strstr(body, "name=\"p3\"\r\n\r\n");
+                // start += 13;
+                // if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[3] = start[0];
+                // for(int i = 0; i < 4; i++) {
+                //     char color = colors[i];
+                //     if(color == 'r') color_to_channel_pin_map[0] = i;
+                //     if(color == 'g') color_to_channel_pin_map[1] = i;
+                //     if(color == 'b') color_to_channel_pin_map[2] = i;
+                //     if(color == 'w') color_to_channel_pin_map[3] = i;
+                // }
                 netbuf_delete(inbuf);
-            } 
+            }
             else if (strncmp(buf, "POST /reboot", 12) == 0) {
-                puts("[httpd_handler] Rebooting\n");
+                puts("[httpd_handler] Rebooting...\n");
                 netbuf_delete(inbuf);
                 hal_reboot();
             } 

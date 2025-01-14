@@ -41,9 +41,24 @@ const char *html_page = "\
             background-color: #0056b3;\
         }\
     </style>\
+    <script>\
+        function setPinHigh(event, pin) {\
+            event.preventDefault();\
+            const formData = new FormData();\
+            formData.append(\"pin\", pin);\
+            fetch(\"/set_pin_high\", {method: \"POST\", body: formData});\
+        }\
+\
+        function setPinLow(event, pin) {\
+            event.preventDefault();\
+            const formData = new FormData();\
+            formData.append(\"pin\", pin);\
+            fetch(\"/set_pin_low\", {method: \"POST\", body: formData});\
+        }\
+    </script>\
 </head>\
 <body>\
-    <span>Build 9</span>\
+    <span>Build 14</span>\
     <div class=\"container\">\
         <h1>Firmware Upload</h1>\
         <form id=\"uploadForm\" action=\"/ota\" method=\"POST\" enctype=\"multipart/form-data\">\
@@ -66,12 +81,42 @@ const char *html_page = "\
     </div>\
 \
     <div class=\"container\">\
-        <h1>PWM change</h1>\
-        <form id=\"pwm-start\" action=\"/pwm_start\" method=\"POST\" enctype=\"multipart/form-data\">\
-            <label for=\"pin\">Pin id (0-3):</label>\
-            <input type=\"number\" id=\"pin_id\" name=\"pin_id\" required/>\
-            <input type=\"number\" id=\"duty\" name=\"duty\" required/>\
-            <button type=\"submit\">Start</button>\
+        <h1>Pin to color mapping</h1>\
+        <form id=\"pwm-start\" action=\"/pin_mapping\" method=\"POST\" enctype=\"multipart/form-data\">\
+            <span>You can turn the pins high / low state to see which color is on that pin. Please map the letters r,g,b and w (if needed) to the pins.</span>\
+            <div class=\"pin-config\">\
+                <label for=\"p0\">Pin 0:</label>\
+                <input type=\"text\" id=\"p0\" name=\"p0\" maxlength=\"1\" placeholder=\"r/g/b/w\"/>\
+                <button onclick=\"setPinHigh(event,0)\">Set high</button>\
+                <button onclick=\"setPinLow(event,0)\">Set low</button>\
+            </div>\
+            <div class=\"pin-config\">\
+                <label for=\"p1\">Pin 1:</label>\
+                <input type=\"text\" id=\"p1\" name=\"p1\" maxlength=\"1\" placeholder=\"r/g/b/w\"/>\
+                <button onclick=\"setPinHigh(event,1)\">Set high</button>\
+                <button onclick=\"setPinLow(event,1)\">Set low</button>\
+            </div>\
+            <div class=\"pin-config\">\
+                <label for=\"p2\">Pin 2:</label>\
+                <input type=\"text\" id=\"p2\" name=\"p2\" maxlength=\"1\" placeholder=\"r/g/b/w\"/>\
+                <button onclick=\"setPinHigh(event,2)\">Set high</button>\
+                <button onclick=\"setPinLow(event,2)\">Set low</button>\
+            </div>\
+            <div class=\"pin-config\">\
+                <label for=\"p3\">Pin 3:</label>\
+                <input type=\"text\" id=\"p3\" name=\"p3\" maxlength=\"1\" placeholder=\"r/g/b/w\"/>\
+                <button onclick=\"setPinHigh(event,3)\">Set high</button>\
+                <button onclick=\"setPinLow(event,3)\">Set low</button>\
+            </div>\
+            <button type=\"submit\">Configure</button>\
+        </form>\
+    </div>\
+\
+    \
+    <div class=\"container\">\
+        <h1>Other actions</h1>\
+        <form id=\"reboot\" action=\"/reboot\" method=\"POST\" enctype=\"multipart/form-data\">\
+            <button type=\"submit\">Reboot</button>\
         </form>\
     </div>\
 \

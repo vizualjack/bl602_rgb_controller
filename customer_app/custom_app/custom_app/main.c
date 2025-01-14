@@ -391,8 +391,8 @@ static void event_loop(void *pvParameters)
     finished_init = true;
 
     for(int i = 0; i < 4; i++) {
-        int id = pwm_to_pin[i][0];
-        int pin = pwm_to_pin[i][1];
+        int id = channel_pin_map[i][0];
+        int pin = channel_pin_map[i][1];
         bl_pwm_init(id, pin, 60000);
         bl_pwm_start(id);
         bl_pwm_set_duty(id, 0);
