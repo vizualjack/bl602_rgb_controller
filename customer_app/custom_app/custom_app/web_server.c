@@ -10,7 +10,7 @@
 #include "connection.c"
 #include "page.h"
 #include "pwm.h"
-
+#include "persistence.h"
 
 #define OTA_PROGRAM_SIZE (512)
 
@@ -242,8 +242,8 @@ static int http_rest_post_wifi(char* buf) {
     memcpy(pass, pass_start, pass_len);
     pass[pass_len] = '\0';
     printf("Wifi PASS: %s\r\n", pass);
-    ef_set_env_blob(WIFI_SSID_KEY, (const char *)&ssid, ssid_len + 1);
-    ef_set_env_blob(WIFI_PASS_KEY, (const char *)&pass, pass_len + 1);
+    set_saved_value(WIFI_SSID_KEY, (const char *)&ssid);
+    set_saved_value(WIFI_PASS_KEY, (const char *)&pass);
     return ERR_OK;
 }
 
@@ -380,13 +380,13 @@ err_t httpd_handler(struct netconn *conn) {
                 if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[3] = start[0];
                 for(int i = 0; i < 4; i++) {
                     char color = colors[i];
-                    if(color == 'r') color_to_channel_pin_map[0] = i;
-                    if(color == 'g') color_to_channel_pin_map[1] = i;
-                    if(color == 'b') color_to_channel_pin_map[2] = i;
-                    if(color == 'w') color_to_channel_pin_map[3] = i;
+                    if(color == 'r') set_red_channel(i);
+                    if(color == 'g') set_green_channel(i);
+                    if(color == 'b') set_blue_channel(i);
+                    if(color == 'w') set_white_channel(i);
                 }
-                printf("Colors:  %s\r\n", colors);
-                printf("Mapping: %i%i%i%i\r\n", color_to_channel_pin_map[0], color_to_channel_pin_map[1], color_to_channel_pin_map[2], color_to_channel_pin_map[3]);
+                save_channels();
+                printf("Colors: %s\r\n", colors);
                 netbuf_delete(inbuf);
             }
             else if (strncmp(buf, "POST /new_duty", 14) == 0) {
@@ -416,6 +416,7 @@ err_t httpd_handler(struct netconn *conn) {
                 w = get_color_value_from_json(body, 'w');
                 printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
                 set_rgbw_duty(r, g, b, w);
+                free(body);
             }
             else if (strncmp(buf, "POST /reboot", 12) == 0) {
                 puts("[httpd_handler] Rebooting...\n");
@@ -451,7 +452,7 @@ void http_server(void *pvParameters) {
     netconn_listen(conn);
 
     puts("[http_server] Listening on port 80......\r\n");
-
+    init_pwm();
     while (1) {
         // Accept new connections
         if (netconn_accept(conn, &newconn) == ERR_OK) {

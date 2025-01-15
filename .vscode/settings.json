@@ -68,6 +68,7 @@
         "api.h": "c",
         "*.def": "c",
         "cstring": "c",
-        "rope": "c"
+        "rope": "c",
+        "cstdio": "c"
     }
 }

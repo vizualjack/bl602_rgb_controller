@@ -1,8 +1,8 @@
 #ifndef _CONNECTION_
 #define _CONNECTION_
 
-static char* WIFI_SSID_KEY = "wifi_ssid";
-static char* WIFI_PASS_KEY = "wifi_pass";
+extern const char* WIFI_SSID_KEY;
+extern const char* WIFI_PASS_KEY;
 void handle_connection(void *pvParameters);
 
 #endif
