@@ -92,6 +92,7 @@
 #include "connection.h"
 #include "web_server.h"
 #include "pwm.h"
+#include "udp_server.h"
 
 #define mainHELLO_TASK_PRIORITY     ( 20 )
 #define UART_ID_2 (2)
@@ -486,8 +487,10 @@ void bfl_main()
     static StaticTask_t event_loop_task;
     static StackType_t connection_task_stack[512];
     static StaticTask_t connection_task;
-    static StackType_t http_server_task_stack[4000];
+    static StackType_t http_server_task_stack[4096];
     static StaticTask_t http_server_task;
+    static StackType_t udp_server_task_stack[4096];
+    static StaticTask_t udp_server_task;
     
     time_main = bl_timer_now_us();
     
@@ -500,8 +503,10 @@ void bfl_main()
     puts("[OS] Added event_loop task\r\n");
     xTaskCreateStatic(handle_connection, (char*)"connection_task", 512, NULL, 14, connection_task_stack, &connection_task);
     puts("[OS] Added connection task\r\n");
-    xTaskCreateStatic(http_server, (char*)"connection_task", 512, NULL, 14, http_server_task_stack, &http_server_task);
+    xTaskCreateStatic(http_server, (char*)"http_server", 4096, NULL, 14, http_server_task_stack, &http_server_task);
     puts("[OS] Added http server task\r\n");
+    xTaskCreateStatic(udp_server, (char*)"udp_server", 4096, NULL, 14, udp_server_task_stack, &udp_server_task);
+    puts("[OS] Added udp server task\r\n");
     puts("[OS] Starting OS Scheduler...\r\n");
     vTaskStartScheduler();
 }
