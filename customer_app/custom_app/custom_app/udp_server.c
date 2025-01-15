@@ -22,7 +22,7 @@ void udp_server(void *pvParameters) {
     while (1) {
         // Accept new connections
         if (netconn_recv(conn, &netbuf) == ERR_OK) {
-            puts("[udp_server] New udp packet\n");
+            // puts("[udp_server] New udp packet\n");
             char *data;
             u16_t len;
             netbuf_data(netbuf, (void **)&data, &len);
@@ -39,10 +39,7 @@ void udp_server(void *pvParameters) {
             int w = ntohl(nums[3]);
 
             // Print the received integers
-            printf("r: %d\r\n", r);
-            printf("g: %d\r\n", g);
-            printf("b: %d\r\n", b);
-            printf("w: %d\r\n", w);
+            // printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
             set_rgbw_duty(r, g, b, w);
             netbuf_delete(netbuf);
             // puts("[udp_server] Udp packet handled successfully\n");
