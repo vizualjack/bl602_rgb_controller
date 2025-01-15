@@ -85,9 +85,8 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
 
 	printf("[OTA] Erasing flash (%lu)...\r\n", bin_size);
 	hal_update_mfg_ptable();
-
-	// Erase in chunks, because erasing everything at once is slow and causes issues with http connection
     // ERASING
+	// Erase in chunks, because erasing everything at once is slow and causes issues with http connection
 	uint32_t erase_offset = 0;
 	uint32_t erase_len = 0;
 	while(erase_offset < bin_size)
@@ -100,18 +99,10 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
 		bl_mtd_erase(handle, erase_offset, erase_len);
 		// printf("[OTA] Erased:  %lu / %lu \r\n", erase_offset, erase_len);
 		erase_offset += erase_len;
-        sys_msleep(100);
+        sys_msleep(200);
 	}
 	printf("[OTA] Flash erased\r\n");
-    // === ERASING ===
-
-
-    // TODO: Edit write logic code
-    // If more data is expected, read it into a buffer
-    // grab data from http post request and write it to flash
-    
-    
-    
+    // === ERASING ===    
 	printf("[OTA] Flashing new firmware\r\n");
     struct netbuf *inbuf;
     char *buf;
@@ -139,7 +130,7 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
                 buf += 4; // Skip past "\r\n\r\n"
                 first = false;
                 int skipped_bytes = buf - before;
-                if(skipped_bytes <= 0) {
+                if(skipped_bytes < 0) {
                     puts("Something is totally wrong\r\n");
                     netbuf_delete(inbuf);
                     return ERR_ARG;
@@ -196,11 +187,9 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
 	ptEntry.len = total;
 	// printf("[OTA] [TCP] Update PARTITION, partition len is %lu\r\n", ptEntry.len);
 	hal_boot2_update_ptable(&ptEntry);
-	puts("[OTA] Rebooting...\r\n");
-    sys_msleep(500);
+	puts("[OTA] Flashed\r\n");
 	vPortFree(recv_buffer);
 	bl_mtd_close(handle);
-    hal_reboot();
     return ERR_OK;
 }
 
@@ -282,22 +271,28 @@ err_t httpd_handler(struct netconn *conn) {
                 puts("Content-Length header not found\n");
             }
             if(strncmp(buf, "POST /ota", 9) == 0) {
-                netbuf_delete(inbuf);
                 puts("[httpd_handler] Handling firmware upload...\n");
-                // I KNOW I'M SENDING the firmware now
-                // Parse and handle the firmware data
                 if (http_rest_post_flash(conn, content_length) != ERR_OK) {
                     const char *error_response =
                         "HTTP/1.1 500 Internal Server Error\r\n"
                         "Connection: close\r\n\r\n"
                         "Failed to process firmware upload.";
                     netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+                    netbuf_delete(inbuf);
+                    netconn_close(conn);
                 } else {
                     const char *success_response =
                         "HTTP/1.1 200 OK\r\n"
                         "Connection: close\r\n\r\n"
                         "Firmware uploaded successfully.";
+                    puts("[OTA] Sending response...\r\n");
                     netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
+                    netbuf_delete(inbuf);
+                    netconn_close(conn);
+                    sys_msleep(1000);
+                    puts("[OTA] Rebooting...\r\n");
+                    sys_msleep(500);
+                    hal_reboot();
                 }
             } else if (strncmp(buf, "POST /wifi", 10) == 0) {
                 puts("[httpd_handler] Handling wifi settings request...\n");
