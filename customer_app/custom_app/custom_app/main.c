@@ -402,6 +402,8 @@ static void event_loop(void *pvParameters)
     puts("------------------------------------------\r\n");
     puts("+++++++++Critical Exit From Loop++++++++++\r\n");
     puts("******************************************\r\n");
+    // should never get here
+    hal_reboot();
     vTaskDelete(NULL);
 }
 
@@ -502,6 +504,4 @@ void bfl_main()
     puts("[OS] Added http server task\r\n");
     puts("[OS] Starting OS Scheduler...\r\n");
     vTaskStartScheduler();
-
-    // hal_reboot
 }
