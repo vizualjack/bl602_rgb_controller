@@ -12,36 +12,227 @@
 #include "pwm.h"
 #include "persistence.h"
 
-#define OTA_PROGRAM_SIZE (512)
+void rebooter() {
+    puts("[Rebooter] Waiting a second...");
+    sys_msleep(1000);
+    puts("[Rebooter] Rebooting...");
+    sys_msleep(500);
+    hal_reboot();
+}
 
-static int http_rest_post_flash(struct netconn *conn, int content_length)
+void trigger_delayed_reboot() {
+    sys_thread_new("rebooter", rebooter, NULL, 512, 29);
+}
+
+void handle_get_requests(struct netconn *conn, const char* buffer) {
+    const char *response =
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/html\r\n"
+            "Connection: close\r\n\r\n";
+    netconn_write(conn, response, strlen(response), NETCONN_COPY);
+    netconn_write(conn, html_page, strlen(html_page), NETCONN_COPY);
+}
+
+// void handle_post_ota(struct netconn *conn, const char* buffer, int buffer_length) {
+//     puts("[httpd_handler] Handling firmware upload...\r\n");
+//     int content_length;
+// 	int ret;
+// 	bl_mtd_handle_t handle;
+//     char *content_length_str = strstr(buffer, "Content-Length:");
+//     if (content_length_str) {
+//         sscanf(content_length_str, "Content-Length: %d", &content_length);
+//         printf("[OTA] Content-Length header found: %d\n", content_length);
+//     } else {
+//         puts("Content-Length header not found\n");
+//         const char *error_response =
+//             "HTTP/1.1 500 Internal Server Error\r\n"
+//             "Connection: close\r\n\r\n"
+//             "Can't content-length header. Please try again!";
+//         netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+//         return;
+//     }
+// 	ret = bl_mtd_open(BL_MTD_PARTITION_NAME_FW_DEFAULT, &handle, BL_MTD_OPEN_FLAG_BACKUP);
+// 	if(ret) {
+//         puts("Open Default FW partition failed\r\n");
+//         const char *error_response =
+//             "HTTP/1.1 500 Internal Server Error\r\n"
+//             "Connection: close\r\n\r\n"
+//             "Can't open partition. Please try again!";
+//         netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+//         return;
+// 	}
+// 	unsigned int flash_offset, ota_addr;
+// 	uint32_t bin_size;
+// 	uint8_t activeID;
+// 	HALPartition_Entry_Config ptEntry;
+// 	activeID = hal_boot2_get_active_partition();
+// 	if(hal_boot2_get_active_entries(BOOT2_PARTITION_TYPE_FW, &ptEntry))
+// 	{
+// 		bl_mtd_close(handle);
+//         puts("PtTable_Get_Active_Entries fail\r\n");
+//         const char *error_response =
+//             "HTTP/1.1 500 Internal Server Error\r\n"
+//             "Connection: close\r\n\r\n"
+//             "Can't get active entries. Please try again!";
+//         netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+//         return;
+// 	}
+// 	ota_addr = ptEntry.Address[!ptEntry.activeIndex];
+// 	bin_size = ptEntry.maxLen[!ptEntry.activeIndex];
+//     if(content_length >= bin_size)
+//     {
+//         puts("BIN file is too big");
+//         const char *error_response =
+//             "HTTP/1.1 500 Internal Server Error\r\n"
+//             "Connection: close\r\n\r\n"
+//             "File is too big";
+//         netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+//         return;
+//     }
+// 	printf("[OTA] Erasing flash (%lu)...\r\n", bin_size);
+// 	hal_update_mfg_ptable();
+// 	uint32_t erase_offset = 0;
+// 	uint32_t erase_len = 0;
+// 	while(erase_offset < bin_size)
+// 	{
+// 		erase_len = bin_size - erase_offset;
+// 		if(erase_len > 0x10000)
+// 		{
+// 			erase_len = 0x10000; //Erase in 64kb chunks
+// 		}
+// 		bl_mtd_erase(handle, erase_offset, erase_len);
+// 		erase_offset += erase_len;
+//         sys_msleep(500);
+// 	}
+// 	printf("[OTA] Flash erased\r\n");
+// 	printf("[OTA] Flashing new firmware\r\n");
+//     struct netbuf *inbuf;
+//     char *buf;
+//     u16_t buflen;
+//     int remaining = content_length;
+//     // char *data_start;
+// 	int total = 0;
+//     char *data_end;
+//     bool first = true;
+//     flash_offset = 0;
+
+//     char* start = strstr(buffer, "\r\n\r\n");
+//     start += 4;
+//     if (start) {
+//         int skipped_bytes = start - buffer;
+//         buflen = buffer_length - skipped_bytes;
+//         printf("[OTA] Found data start in initial buffer, skipping %td bytes\r\n", skipped_bytes);
+//         bl_mtd_write(handle, flash_offset, buflen, (u_int8_t*)start);
+//         flash_offset += buflen;
+//         total += buflen;
+//         remaining -= buffer_length;
+//         first = false;
+//     }
+//     int max_packet_size = 0;
+//     while (remaining > 0) {
+//         if (netconn_recv(conn, &inbuf) == ERR_OK) {
+//             netbuf_data(inbuf, (void **)&buf, &buflen);
+//             remaining -= buflen;
+//             // if(max_packet_size == 0) max_packet_size = buflen;
+//             if (first) {
+//                 char* start = strstr(buf, "\r\n\r\n");
+//                 int skipped_bytes = 0;
+//                 if(start)  {
+//                     start += 4; // Skip "\r\n\r\n"
+//                     skipped_bytes = start - buf;
+//                     buf = start;
+//                     buflen -= skipped_bytes;
+//                     printf("[OTA] Found data start, skipping %td bytes\r\n", skipped_bytes);
+//                     first = false;
+//                 } else {
+//                     puts("Something is totally wrong\r\n");
+//                     printf("Last body: %s\r\n", buf);
+//                     bl_mtd_close(handle);
+//                     const char *error_response =
+//                         "HTTP/1.1 500 Internal Server Error\r\n"
+//                         "Connection: close\r\n\r\n"
+//                         "Can't find start of request. Please try again!";
+//                     netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+//                     netbuf_delete(inbuf);
+//                     return;
+//                 }
+//             }
+//             data_end = strstr(buf, "\r\n------");
+//             if(data_end != NULL) {
+//                 buflen = (data_end - buf);
+//                 printf("[OTA] Found data end, last frame total bytes are %td\r\n", data_end - buf);
+//             }
+//             bl_mtd_write(handle, flash_offset, buflen, (u_int8_t*)buf);
+//             flash_offset += buflen;
+//             total += buflen;
+//             netbuf_delete(inbuf);
+//             printf("remaining: %d\r\n", remaining);
+//             // if(max_packet_size != 0 && buflen < max_packet_size) break;
+//         } else {
+//             puts("Error receiving additional data\n");
+// 	        bl_mtd_close(handle);
+//             const char *error_response =
+//                 "HTTP/1.1 500 Internal Server Error\r\n"
+//                 "Connection: close\r\n\r\n"
+//                 "Error while receiving request. Please try again!";
+//             netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+//             return;
+//         }
+//     }
+// 	printf("[OTA] Flashed new firmware\r\n");
+// 	printf("[OTA] set OTA partition length\r\n");
+// 	ptEntry.len = total;
+// 	// ptEntry.len = content_length;
+// 	hal_boot2_update_ptable(&ptEntry);
+// 	puts("[OTA] Flashed\r\n");
+// 	bl_mtd_close(handle);
+//     const char *success_response =
+//         "HTTP/1.1 200 OK\r\n"
+//         "Connection: close\r\n\r\n"
+//         "Firmware uploaded successfully.";
+//     puts("[OTA] Sending response...\r\n");
+//     netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
+//     trigger_delayed_reboot();
+//     // sys_msleep(1000);
+//     // puts("[OTA] Rebooting...\r\n");
+//     // sys_msleep(500);
+//     // hal_reboot();
+//     // // before stuff
+//     // if (http_rest_post_flash(conn, content_length) != ERR_OK) {
+// }
+
+void handle_post_ota(struct netconn *conn, const char* buffer, int buffer_length)
 {
-	// int towrite = content_length;
-	// char* writebuf = max_file_size;
-	// int writelen = content_length;
-	// int fsize = 0;
+    
+    int content_length;
+    char *content_length_str = strstr(buffer, "Content-Length:");
+    if (content_length_str) {
+        sscanf(content_length_str, "Content-Length: %d", &content_length);
+        printf("[OTA] Content-Length header found: %d\n", content_length);
+    } else {
+        puts("Content-Length header not found\n");
+        const char *error_response =
+            "HTTP/1.1 500 Internal Server Error\r\n"
+            "Connection: close\r\n\r\n"
+            "Can't content-length header. Please try again!";
+        netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+        return;
+    }
 
-	// ADDLOG_DEBUG(LOG_FEATURE_OTA, "OTA post len %d", request->contentLength);
-
-	// int sockfd, i;
 	int ret;
-	// struct hostent* hostinfo;
-	uint8_t* recv_buffer;
-	// struct sockaddr_in dest;
-	// iot_sha256_context ctx;
-	// uint8_t sha256_result[32];
-	// uint8_t sha256_img[32];
 	bl_mtd_handle_t handle;
 
 	ret = bl_mtd_open(BL_MTD_PARTITION_NAME_FW_DEFAULT, &handle, BL_MTD_OPEN_FLAG_BACKUP);
 	if(ret)
 	{
-		// return http_rest_error(request, -20, "Open Default FW partition failed");
         puts("Open Default FW partition failed\r\n");
-        return 1;
+        const char *error_response =
+            "HTTP/1.1 500 Internal Server Error\r\n"
+            "Connection: close\r\n\r\n"
+            "Can't open partition. Please try again!";
+        netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+        return;
 	}
-
-	recv_buffer = pvPortMalloc(OTA_PROGRAM_SIZE);
 
 	unsigned int flash_offset, ota_addr;
 	uint32_t bin_size;
@@ -50,43 +241,34 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
 
 	activeID = hal_boot2_get_active_partition();
 
-	// printf("Starting OTA test. OTA bin addr is %p, incoming len %i\r\n", recv_buffer, writelen);
-
-	// printf("[OTA] [TEST] activeID is %u\r\n", activeID);
 
 	if(hal_boot2_get_active_entries(BOOT2_PARTITION_TYPE_FW, &ptEntry))
 	{
-		vPortFree(recv_buffer);
+		// vPortFree(recv_buffer);
 		bl_mtd_close(handle);
-		// return http_rest_error(request, -20, "PtTable_Get_Active_Entries fail");
         puts("PtTable_Get_Active_Entries fail\r\n");
-        return 1;
+        const char *error_response =
+            "HTTP/1.1 500 Internal Server Error\r\n"
+            "Connection: close\r\n\r\n"
+            "Can't get active entries. Please try again!";
+        netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+        return;
 	}
 	ota_addr = ptEntry.Address[!ptEntry.activeIndex];
 	bin_size = ptEntry.maxLen[!ptEntry.activeIndex];
 
-	// part_size = ptEntry.maxLen[!ptEntry.activeIndex];
-	// (void)part_size;
-	/*XXX if you use bin_size is product env, you may want to set bin_size to the actual
-	 * OTA BIN size, and also you need to splilt XIP_SFlash_Erase_With_Lock into
-	 * serveral pieces. Partition size vs bin_size check is also needed
-	 */
-
-	// printf("Starting OTA test. OTA size is %lu\r\n", bin_size);
-
     if(content_length >= bin_size)
     {
         puts("BIN file is too big");
-        return 1;
-        // return http_rest_error(request, -20, "Too large bin");
+        const char *error_response =
+            "HTTP/1.1 500 Internal Server Error\r\n"
+            "Connection: close\r\n\r\n"
+            "File is too big";
+        netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+        return;
     }
-
-	// printf("[OTA] [TEST] activeIndex is %u, use OTA address=%08x\r\n", ptEntry.activeIndex, (unsigned int)ota_addr);
-
 	printf("[OTA] Erasing flash (%lu)...\r\n", bin_size);
 	hal_update_mfg_ptable();
-    // ERASING
-	// Erase in chunks, because erasing everything at once is slow and causes issues with http connection
 	uint32_t erase_offset = 0;
 	uint32_t erase_len = 0;
 	while(erase_offset < bin_size)
@@ -97,31 +279,23 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
 			erase_len = 0x10000; //Erase in 64kb chunks
 		}
 		bl_mtd_erase(handle, erase_offset, erase_len);
-		// printf("[OTA] Erased:  %lu / %lu \r\n", erase_offset, erase_len);
 		erase_offset += erase_len;
         sys_msleep(200);
 	}
 	printf("[OTA] Flash erased\r\n");
-    // === ERASING ===    
 	printf("[OTA] Flashing new firmware\r\n");
     struct netbuf *inbuf;
     char *buf;
     u16_t buflen;
     int remaining = content_length;
-    // char *data_start;
 	int total = 0;
     char *data_end;
     bool first = true;
     flash_offset = 0;
     while (remaining > 0) {
-        // char chunk[MAX_BUFFER_SIZE];
-        // int to_read = remaining > MAX_BUFFER_SIZE ? MAX_BUFFER_SIZE : remaining;
         err_t recv_err = netconn_recv(conn, &inbuf);
         if (recv_err == ERR_OK) {
             netbuf_data(inbuf, (void **)&buf, &buflen);
-            // memcpy(post_data + body_length, buf, buflen);
-            // body_length += buflen;
-            // printf("Buflen: %d\r\n", buflen);
             remaining -= buflen;
             // data transmission
             if (first) {
@@ -132,8 +306,14 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
                 int skipped_bytes = buf - before;
                 if(skipped_bytes < 0) {
                     puts("Something is totally wrong\r\n");
+                    bl_mtd_close(handle);
+                    const char *error_response =
+                        "HTTP/1.1 500 Internal Server Error\r\n"
+                        "Connection: close\r\n\r\n"
+                        "Can't find start of request. Please try again!";
+                    netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
                     netbuf_delete(inbuf);
-                    return ERR_ARG;
+                    return;
                 }
                 buflen -= skipped_bytes;
                 printf("[OTA] Found data start, skipping %td bytes\r\n", skipped_bytes);
@@ -146,66 +326,57 @@ static int http_rest_post_flash(struct netconn *conn, int content_length)
             bl_mtd_write(handle, flash_offset, buflen, (u_int8_t*)buf);
             flash_offset += buflen;
             total += buflen;
-            // printf("Flash takes %i\r\n", buflen);
-            // printf("remaining %i\r\n", remaining);
-            // printf("total %i\r\n", total);
             netbuf_delete(inbuf);
         } else {
             puts("Error receiving additional data\n");
-            // free(post_data);
-            netbuf_delete(inbuf);
-            return ERR_CLSD;
+	        bl_mtd_close(handle);
+            const char *error_response =
+                "HTTP/1.1 500 Internal Server Error\r\n"
+                "Connection: close\r\n\r\n"
+                "Error while receiving request. Please try again!";
+            netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
+            return;
         }
     }
 	printf("[OTA] Flashed new firmware\r\n");
-    // flash write logic
-	// buffer_offset = 0;
-	// flash_offset = 0;
-	// do
-	// {
-	// 	char* useBuf = writebuf;
-	// 	int useLen = writelen;
-
-
-	// 	if(useLen)
-	// 	{
-			
-	// 		//ADDLOG_DEBUG(LOG_FEATURE_OTA, "%d bytes to write", writelen);
-	// 		//add_otadata((unsigned char*)writebuf, writelen);
-
-	// 		printf("Flash takes %i. ", useLen);
-	// 		bl_mtd_write(handle, flash_offset, useLen, (u_int8_t*)useBuf);
-	// 		flash_offset += useLen;
-	// 	}
-
-	// 	total += writelen;
-	// 	towrite -= writelen;
-
-	// } while((towrite > 0) && (writelen >= 0));
-    // ==== flash write logic ====
 	printf("[OTA] set OTA partition length\r\n");
 	ptEntry.len = total;
-	// printf("[OTA] [TCP] Update PARTITION, partition len is %lu\r\n", ptEntry.len);
 	hal_boot2_update_ptable(&ptEntry);
 	puts("[OTA] Flashed\r\n");
-	vPortFree(recv_buffer);
 	bl_mtd_close(handle);
-    return ERR_OK;
+    const char *success_response =
+        "HTTP/1.1 200 OK\r\n"
+        "Connection: close\r\n\r\n"
+        "Firmware uploaded successfully.";
+    puts("[OTA] Sending response...\r\n");
+    netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
+    trigger_delayed_reboot();
 }
 
-static int http_rest_post_wifi(char* buf) {
+void handle_wifi_settings(struct netconn *conn, const char* buffer) {
+    puts("[httpd_handler] Handling wifi settings request...\n");
     // SSID
-    char* ssid_start = strstr(buf, "name=\"ssid\"\r\n\r\n");
+    char* ssid_start = strstr(buffer, "name=\"ssid\"\r\n\r\n");
     ssid_start += 15;
     if(ssid_start == NULL) {
         puts("Can't find SSID");
-        return ERR_ARG;
+        const char *success_response =
+            "HTTP/1.1 500 OK\r\n"
+            "Connection: close\r\n\r\n"
+            "No ssid provided.";
+        netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
+        return;
     }
     char* ssid_end = strstr(ssid_start, "\r\n------");
     if(ssid_end == NULL) {
         puts("Can't find SSID end");
         printf("Start: %s\r\n", ssid_start);
-        return ERR_ARG;
+        const char *success_response =
+            "HTTP/1.1 500 OK\r\n"
+            "Connection: close\r\n\r\n"
+            "No ssid provided.";
+        netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
+        return;
     }
     int ssid_len = ssid_end - ssid_start;
     printf("SSID length: %d\r\n", ssid_len);
@@ -217,13 +388,23 @@ static int http_rest_post_wifi(char* buf) {
     char* pass_start = strstr(ssid_end, "name=\"pass\"\r\n\r\n");
     if(pass_start == NULL) {
         puts("Can't find PASS\r\n");
-        return ERR_ARG;
+        const char *success_response =
+            "HTTP/1.1 500 OK\r\n"
+            "Connection: close\r\n\r\n"
+            "No password provided.";
+        netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
+        return;
     }
     pass_start += 15;
     char* pass_end = strstr(pass_start, "\r\n------");
     if(pass_end == NULL) {
         puts("Can't find PASS end\r\n");
-        return ERR_ARG;
+        const char *success_response =
+            "HTTP/1.1 500 OK\r\n"
+            "Connection: close\r\n\r\n"
+            "No password provided.";
+        netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
+        return;
     }
     int pass_len = pass_end - pass_start;
     printf("PASS length: %d\r\n", pass_len);
@@ -233,7 +414,75 @@ static int http_rest_post_wifi(char* buf) {
     printf("Wifi PASS: %s\r\n", pass);
     set_saved_value(WIFI_SSID_KEY, (const char *)&ssid);
     set_saved_value(WIFI_PASS_KEY, (const char *)&pass);
-    return ERR_OK;
+    const char *success_response =
+        "HTTP/1.1 200 OK\r\n"
+        "Connection: close\r\n\r\n"
+        "Changed wifi settings.";
+    netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
+    // netbuf_delete(inbuf);
+    // free(body);
+}
+
+void handle_pin_set_state(struct netconn *conn, const char* buffer) {
+    // char* body = malloc(content_length + 1);
+    // char* body_start = strstr(buf, "\r\n\r\n");
+    // body_start += 4;
+    // char* body_end = buf + buflen;
+    // int total_length = body_end - body_start;
+    // printf("Total length: %i\r\n", total_length);
+    // memcpy(body, body_start, total_length);
+    // body[content_length] = '\0';
+    char* start = strstr(buffer, "name=\"pin\"\r\n\r\n");
+    start += 14;
+    int channel_index = atoi(start);
+    bool setHigh = strncmp(buffer, "POST /set_pin_high", 18) == 0;
+    set_channel_duty(channel_index, setHigh ? 100 : 0);
+}
+
+void handle_pin_mapping(struct netconn *conn, const char* buffer) {
+    // char* body = malloc(content_length + 1);
+    // char* body_start = strstr(buf, "\r\n\r\n");
+    // body_start += 4;
+    // char* body_end = buf + buflen;
+    // int total_length = body_end - body_start;
+    // printf("Total length: %i\r\n", total_length);
+    // memcpy(body, body_start, total_length);
+    // netbuf_delete(inbuf);
+    // if (netconn_recv(conn, &inbuf) == ERR_OK) {
+    //     puts("Got additional data\r\n");
+    //     netbuf_data(inbuf, (void **)&buf, &buflen);
+    //     printf("Additional data length: %i\r\n", buflen);
+    //     memcpy(body + total_length, buf, buflen);
+    // }
+    // body[content_length] = '\0';
+    char colors[5] = {'-', '-', '-', '-', '\0'};
+    char* start = strstr(buffer, "name=\"p0\"\r\n\r\n");
+    start += 13;
+    if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[0] = start[0];
+    start = strstr(buffer, "name=\"p1\"\r\n\r\n");
+    start += 13;
+    if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[1] = start[0];
+    start = strstr(buffer, "name=\"p2\"\r\n\r\n");
+    start += 13;
+    if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[2] = start[0];
+    start = strstr(buffer, "name=\"p3\"\r\n\r\n");
+    start += 13;
+    if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[3] = start[0];
+    for(int i = 0; i < 4; i++) {
+        char color = colors[i];
+        if(color == 'r') set_red_channel(i);
+        if(color == 'g') set_green_channel(i);
+        if(color == 'b') set_blue_channel(i);
+        if(color == 'w') set_white_channel(i);
+    }
+    save_channels();
+    printf("Colors: %s\r\n", colors);
+    const char *response =
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Connection: close\r\n\r\n"
+        "Successfully changed pin mapping";
+    netconn_write(conn, response, strlen(response), NETCONN_COPY);
 }
 
 int get_color_value_from_json(const char* json, char color_key) {
@@ -246,200 +495,138 @@ int get_color_value_from_json(const char* json, char color_key) {
     return val;
 }
 
+void handle_new_duty(struct netconn *conn, const char* buffer) {
+    // char* body = malloc(content_length + 1);
+    // char* body_start = strstr(buf, "\r\n\r\n");
+    // body_start += 4;
+    // char* body_end = buf + buflen;
+    // int total_length = body_end - body_start;
+    // printf("Total length: %i\r\n", total_length);
+    // if(total_length > 0) memcpy(body, body_start, total_length);
+    // if (total_length == 0) {
+    //     struct netbuf *inbuf;
+    //     if (netconn_recv(conn, &inbuf) == ERR_OK) {
+    //         puts("Got additional data\r\n");
+    //         netbuf_data(inbuf, (void **)&buf, &buflen);
+    //         printf("Additional data length: %i\r\n", buflen);
+    //         memcpy(body + total_length, buf, buflen);
+    //         netbuf_delete(inbuf);
+    //     }
+    // }
+    // body[content_length] = '\0';
+    // printf("Body: %s\r\n", body);
+    int r, g, b, w;
+    r = get_color_value_from_json(buffer, 'r');
+    g = get_color_value_from_json(buffer, 'g');
+    b = get_color_value_from_json(buffer, 'b');
+    w = get_color_value_from_json(buffer, 'w');
+    // printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
+    set_rgbw_duty(r, g, b, w);
+    const char *response =
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Connection: close\r\n\r\n"
+        "Successfully changed color";
+    netconn_write(conn, response, strlen(response), NETCONN_COPY);
+    // free(body);
+}
+
+void handle_rebooting(struct netconn *conn, const char* buffer) {
+    puts("[httpd_handler] Rebooting...\n");
+    const char *response =
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Connection: close\r\n\r\n"
+        "Rebooting...";
+    netconn_write(conn, response, strlen(response), NETCONN_COPY);
+    trigger_delayed_reboot();
+}
+
+void handle_post_requests(struct netconn *conn, const char* buffer) {
+    puts("[httpd_handler] Handling POST request...\n");
+    if (strncmp(buffer, "POST /wifi", 10) == 0) {
+        handle_wifi_settings(conn, buffer);
+    }
+    else if (strncmp(buffer, "POST /set_pin_high", 18) == 0 || strncmp(buffer, "POST /set_pin_low", 17) == 0) {
+        handle_pin_set_state(conn, buffer);
+    }
+    else if (strncmp(buffer, "POST /pin_mapping", 17) == 0) {
+        handle_pin_mapping(conn, buffer);
+    }
+    else if (strncmp(buffer, "POST /new_duty", 14) == 0) {
+        handle_new_duty(conn, buffer);
+    }
+    else if (strncmp(buffer, "POST /reboot", 12) == 0) {
+        handle_rebooting(conn, buffer);
+    } 
+}
+
+#define MAX_BUFFER_SIZE 1024
 err_t httpd_handler(struct netconn *conn) {
+    static char buffer[MAX_BUFFER_SIZE];
     struct netbuf *inbuf;
     char *buf;
     u16_t buflen;
-
-    // Receive HTTP request
-    if (netconn_recv(conn, &inbuf) == ERR_OK) {
+    int total_length = 0;
+    int content_length = 0;
+    bool already_handled = false;
+    err_t error = ERR_OK;
+    // Clean the buffer
+    memset(buffer, 0, sizeof(buffer));
+    // Receive whole HTTP request
+    while (netconn_recv(conn, &inbuf) == ERR_OK) {
         netbuf_data(inbuf, (void **)&buf, &buflen);
-        
-        printf("HTTP Length: %i\n", buflen);
-        printf("HTTP Request: %s\n\n", buf);
-
-        // Check if the request is a POST (for file upload)
-        if (strncmp(buf, "POST ", 5) == 0) {
-            puts("[httpd_handler] Handling POST request...\n");
-            int content_length = 0;
-            // Parse Content-Length header
-            char *content_length_str = strstr(buf, "Content-Length:");
+        memcpy(buffer + total_length, buf, buflen);
+        total_length += buflen;
+        // special case (ota cause of bigger data)
+        if(strncmp(buffer, "POST /ota", 9) == 0) {
+            handle_post_ota(conn, buffer, buflen);
+            already_handled = true;
+            break;
+        }
+        if(content_length == 0) {
+            char *content_length_str = strstr(buffer, "Content-Length:");
             if (content_length_str) {
                 sscanf(content_length_str, "Content-Length: %d", &content_length);
                 printf("Content-Length header found: %d\n", content_length);
+                // printf("buffer: %s\n", buffer);
+                // printf("buflen: %d\n", buflen);
+                char* body_start = strstr(buffer, "\r\n\r\n");
+                if(body_start) {
+                    // puts("Body start found\r\n");
+                    body_start += 4;
+                    int skipped_bytes = body_start - (char*)&buffer;
+                    int body_len = buflen - skipped_bytes;
+                    if(body_len == content_length) break;
+                }
             } else {
                 puts("Content-Length header not found\n");
+                break;
             }
-            if(strncmp(buf, "POST /ota", 9) == 0) {
-                puts("[httpd_handler] Handling firmware upload...\n");
-                if (http_rest_post_flash(conn, content_length) != ERR_OK) {
-                    const char *error_response =
-                        "HTTP/1.1 500 Internal Server Error\r\n"
-                        "Connection: close\r\n\r\n"
-                        "Failed to process firmware upload.";
-                    netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
-                    netbuf_delete(inbuf);
-                    netconn_close(conn);
-                } else {
-                    const char *success_response =
-                        "HTTP/1.1 200 OK\r\n"
-                        "Connection: close\r\n\r\n"
-                        "Firmware uploaded successfully.";
-                    puts("[OTA] Sending response...\r\n");
-                    netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
-                    netbuf_delete(inbuf);
-                    netconn_close(conn);
-                    sys_msleep(1000);
-                    puts("[OTA] Rebooting...\r\n");
-                    sys_msleep(500);
-                    hal_reboot();
-                }
-            } else if (strncmp(buf, "POST /wifi", 10) == 0) {
-                puts("[httpd_handler] Handling wifi settings request...\n");
-                char* body = malloc(content_length + 1);
-                char* body_start = strstr(buf, "\r\n\r\n");
-                body_start += 4;
-                char* body_end = buf + buflen;
-                int total_length = body_end - body_start;
-                printf("Total length: %i\r\n", total_length);
-                memcpy(body, body_start, total_length);
-                netbuf_delete(inbuf);
-                if (netconn_recv(conn, &inbuf) == ERR_OK) {
-                    puts("Got additional data\r\n");
-                    netbuf_data(inbuf, (void **)&buf, &buflen);
-                    printf("Additional data length: %i\r\n", buflen);
-                    memcpy(body + total_length, buf, buflen);
-                }
-                body[content_length] = '\0';
-                printf("Body: %s\r\n", body);
-                if (http_rest_post_wifi(body) != ERR_OK) {
-                    const char *error_response =
-                        "HTTP/1.1 500 Internal Server Error\r\n"
-                        "Connection: close\r\n\r\n"
-                        "Failed to process new wifi settings.";
-                    netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
-                } else {
-                    const char *success_response =
-                        "HTTP/1.1 200 OK\r\n"
-                        "Connection: close\r\n\r\n"
-                        "Changed wifi settings.";
-                    netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
-                }
-                netbuf_delete(inbuf);
-                free(body);
-            }
-            else if (strncmp(buf, "POST /set_pin_high", 18) == 0 || strncmp(buf, "POST /set_pin_low", 17) == 0) {
-                char* body = malloc(content_length + 1);
-                char* body_start = strstr(buf, "\r\n\r\n");
-                body_start += 4;
-                char* body_end = buf + buflen;
-                int total_length = body_end - body_start;
-                printf("Total length: %i\r\n", total_length);
-                memcpy(body, body_start, total_length);
-                body[content_length] = '\0';
-                char* start = strstr(body, "name=\"pin\"\r\n\r\n");
-                start += 14;
-                int channel_index = atoi(start);
-                bool setHigh = strncmp(buf, "POST /set_pin_high", 18) == 0;
-                set_channel_duty(channel_index, setHigh ? 100 : 0);
-                netbuf_delete(inbuf);
-            }
-            else if (strncmp(buf, "POST /pin_mapping", 17) == 0) {
-                char* body = malloc(content_length + 1);
-                char* body_start = strstr(buf, "\r\n\r\n");
-                body_start += 4;
-                char* body_end = buf + buflen;
-                int total_length = body_end - body_start;
-                printf("Total length: %i\r\n", total_length);
-                memcpy(body, body_start, total_length);
-                netbuf_delete(inbuf);
-                if (netconn_recv(conn, &inbuf) == ERR_OK) {
-                    puts("Got additional data\r\n");
-                    netbuf_data(inbuf, (void **)&buf, &buflen);
-                    printf("Additional data length: %i\r\n", buflen);
-                    memcpy(body + total_length, buf, buflen);
-                }
-                body[content_length] = '\0';
-                char colors[5] = {'-', '-', '-', '-', '\0'};
-                char* start = strstr(body, "name=\"p0\"\r\n\r\n");
-                start += 13;
-                if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[0] = start[0];
-                start = strstr(body, "name=\"p1\"\r\n\r\n");
-                start += 13;
-                if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[1] = start[0];
-                start = strstr(body, "name=\"p2\"\r\n\r\n");
-                start += 13;
-                if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[2] = start[0];
-                start = strstr(body, "name=\"p3\"\r\n\r\n");
-                start += 13;
-                if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[3] = start[0];
-                for(int i = 0; i < 4; i++) {
-                    char color = colors[i];
-                    if(color == 'r') set_red_channel(i);
-                    if(color == 'g') set_green_channel(i);
-                    if(color == 'b') set_blue_channel(i);
-                    if(color == 'w') set_white_channel(i);
-                }
-                save_channels();
-                printf("Colors: %s\r\n", colors);
-                netbuf_delete(inbuf);
-            }
-            else if (strncmp(buf, "POST /new_duty", 14) == 0) {
-                char* body = malloc(content_length + 1);
-                char* body_start = strstr(buf, "\r\n\r\n");
-                body_start += 4;
-                char* body_end = buf + buflen;
-                int total_length = body_end - body_start;
-                printf("Total length: %i\r\n", total_length);
-                if(total_length > 0) memcpy(body, body_start, total_length);
-                netbuf_delete(inbuf);
-                if (total_length == 0) {
-                    if (netconn_recv(conn, &inbuf) == ERR_OK) {
-                        puts("Got additional data\r\n");
-                        netbuf_data(inbuf, (void **)&buf, &buflen);
-                        printf("Additional data length: %i\r\n", buflen);
-                        memcpy(body + total_length, buf, buflen);
-                        netbuf_delete(inbuf);
-                    }
-                }
-                body[content_length] = '\0';
-                printf("Body: %s\r\n", body);
-                int r, g, b, w;
-                r = get_color_value_from_json(body, 'r');
-                g = get_color_value_from_json(body, 'g');
-                b = get_color_value_from_json(body, 'b');
-                w = get_color_value_from_json(body, 'w');
-                printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
-                set_rgbw_duty(r, g, b, w);
-                const char *response =
-                    "HTTP/1.1 200 OK\r\n"
-                    "Content-Type: text/html\r\n"
-                    "Connection: close\r\n\r\n";
-                netconn_write(conn, response, strlen(response), NETCONN_COPY);
-                free(body);
-            }
-            else if (strncmp(buf, "POST /reboot", 12) == 0) {
-                puts("[httpd_handler] Rebooting...\n");
-                netbuf_delete(inbuf);
-                hal_reboot();
-            } 
-            else netbuf_delete(inbuf);
-        } else {
-            // Default response (serves an HTML page)
+        }
+        if(content_length > MAX_BUFFER_SIZE) {
             const char *response =
                 "HTTP/1.1 200 OK\r\n"
                 "Content-Type: text/html\r\n"
                 "Connection: close\r\n\r\n";
             netconn_write(conn, response, strlen(response), NETCONN_COPY);
-            netconn_write(conn, html_page, strlen(html_page), NETCONN_COPY);
             netbuf_delete(inbuf);
+            error = ERR_ARG;
+            break;
+        }
+        netbuf_delete(inbuf);
+    }
+    // buffer[total_length] = '\0'; / should be useless because of memset
+    if (!already_handled && error == ERR_OK) {
+        // Check if the request is a POST (for file upload)
+        if (strncmp(buf, "POST ", 5) == 0) {
+            handle_post_requests(conn, buffer);
+        } else {
+            handle_get_requests(conn, buffer);
         }
     }
-
-    // Close and delete the connection
-    netconn_close(conn);
-
-    return ERR_OK;
+    netbuf_delete(inbuf);
+    return error;
 }
 
 // Start the HTTP server
@@ -458,6 +645,7 @@ void http_server(void *pvParameters) {
         if (netconn_accept(conn, &newconn) == ERR_OK) {
             puts("[http_server] New tcp connection established\n");
             httpd_handler(newconn);
+            netconn_close(newconn);
             netconn_delete(newconn);
             puts("[http_server] Tcp connection closed successfully\n");
         }
