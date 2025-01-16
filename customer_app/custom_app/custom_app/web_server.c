@@ -582,6 +582,7 @@ err_t httpd_handler(struct netconn *conn) {
         if(strncmp(buffer, "POST /ota", 9) == 0) {
             handle_post_ota(conn, buffer, buflen);
             already_handled = true;
+            netbuf_delete(inbuf);
             break;
         }
         if(content_length == 0) {
@@ -601,6 +602,7 @@ err_t httpd_handler(struct netconn *conn) {
                 }
             } else {
                 puts("Content-Length header not found\n");
+                netbuf_delete(inbuf);
                 break;
             }
         }
