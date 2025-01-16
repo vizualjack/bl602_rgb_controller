@@ -411,6 +411,11 @@ err_t httpd_handler(struct netconn *conn) {
                 w = get_color_value_from_json(body, 'w');
                 printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
                 set_rgbw_duty(r, g, b, w);
+                const char *response =
+                    "HTTP/1.1 200 OK\r\n"
+                    "Content-Type: text/html\r\n"
+                    "Connection: close\r\n\r\n";
+                netconn_write(conn, response, strlen(response), NETCONN_COPY);
                 free(body);
             }
             else if (strncmp(buf, "POST /reboot", 12) == 0) {
