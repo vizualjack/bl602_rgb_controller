@@ -69,6 +69,11 @@
         "*.def": "c",
         "cstring": "c",
         "rope": "c",
-        "cstdio": "c"
+        "cstdio": "c",
+        "bitset": "c",
+        "string_view": "c",
+        "slist": "c",
+        "initializer_list": "c",
+        "valarray": "c"
     }
 }

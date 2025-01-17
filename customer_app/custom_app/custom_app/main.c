@@ -481,15 +481,19 @@ static void system_init(void)
     tcpip_init(NULL, NULL);
 }
 
+#define EVENT_LOOP_STACK_SIZE 4096
+#define CONNECTION_TASK_STACK_SIZE 4096
+#define HTTP_SERVER_STACK_SIZE 10240
+#define UDP_SERVER_STACK_SIZE 4096
 void bfl_main()
 {
-    static StackType_t event_loop_stack[2048];
+    static StackType_t event_loop_stack[EVENT_LOOP_STACK_SIZE];
     static StaticTask_t event_loop_task;
-    static StackType_t connection_task_stack[512];
+    static StackType_t connection_task_stack[CONNECTION_TASK_STACK_SIZE];
     static StaticTask_t connection_task;
-    static StackType_t http_server_task_stack[4096];
+    static StackType_t http_server_task_stack[HTTP_SERVER_STACK_SIZE];
     static StaticTask_t http_server_task;
-    static StackType_t udp_server_task_stack[4096];
+    static StackType_t udp_server_task_stack[UDP_SERVER_STACK_SIZE];
     static StaticTask_t udp_server_task;
     
     time_main = bl_timer_now_us();
@@ -499,13 +503,13 @@ void bfl_main()
     puts("Starting firmware now....\r\n");
     system_init();
     // Tasks
-    xTaskCreateStatic(event_loop, (char*)"event_loop", 1024, NULL, 15, event_loop_stack, &event_loop_task);
+    xTaskCreateStatic(event_loop, (char*)"event_loop", EVENT_LOOP_STACK_SIZE, NULL, 15, event_loop_stack, &event_loop_task);
     puts("[OS] Added event_loop task\r\n");
-    xTaskCreateStatic(handle_connection, (char*)"connection_task", 512, NULL, 14, connection_task_stack, &connection_task);
+    xTaskCreateStatic(handle_connection, (char*)"connection_task", CONNECTION_TASK_STACK_SIZE, NULL, 14, connection_task_stack, &connection_task);
     puts("[OS] Added connection task\r\n");
-    xTaskCreateStatic(http_server, (char*)"http_server", 4096, NULL, 14, http_server_task_stack, &http_server_task);
+    xTaskCreateStatic(http_server, (char*)"http_server", HTTP_SERVER_STACK_SIZE, NULL, 14, http_server_task_stack, &http_server_task);
     puts("[OS] Added http server task\r\n");
-    xTaskCreateStatic(udp_server, (char*)"udp_server", 4096, NULL, 14, udp_server_task_stack, &udp_server_task);
+    xTaskCreateStatic(udp_server, (char*)"udp_server", UDP_SERVER_STACK_SIZE, NULL, 14, udp_server_task_stack, &udp_server_task);
     puts("[OS] Added udp server task\r\n");
     puts("[OS] Starting OS Scheduler...\r\n");
     vTaskStartScheduler();

@@ -13,7 +13,7 @@
 void udp_server(void *pvParameters) {
     struct netconn *conn;
     struct netbuf *netbuf;
-    puts("[http_server] Starting...\r\n");
+    puts("[udp_server] Starting...\r\n");
     // Create a new TCP connection
     conn = netconn_new(NETCONN_UDP);
     netconn_bind(conn, IP_ADDR_ANY, 1337);
@@ -39,7 +39,7 @@ void udp_server(void *pvParameters) {
             int w = ntohl(nums[3]);
 
             // Print the received integers
-            // printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
+            printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
             set_rgbw_duty(r, g, b, w);
             netbuf_delete(netbuf);
             // puts("[udp_server] Udp packet handled successfully\n");
