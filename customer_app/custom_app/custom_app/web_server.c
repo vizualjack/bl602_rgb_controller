@@ -584,6 +584,7 @@ void handle_post_requests(struct netconn* conn, const char* inital_data, struct 
     }
     char body_content[MAX_BODY_SIZE];
     int current_body_size = strlen(body);
+    memset(body_content, 0, MAX_BODY_SIZE);
     memcpy(body_content, body, current_body_size);
     while(current_body_size < content_length) {
         netbuf_delete(*inbuf);
@@ -610,8 +611,7 @@ void handle_post_requests(struct netconn* conn, const char* inital_data, struct 
         memcpy(body_content + current_body_size, data, datalen);
         current_body_size += datalen;
     }
-    puts("Got total body\n");
-    memset(body_content, 0, MAX_BODY_SIZE);
+    puts("Got total body\n");;
     printf("Body: %s\n", body_content);
     if (strstr(inital_data, "POST /wifi") != NULL) {
         handle_wifi_settings(conn, body_content);
