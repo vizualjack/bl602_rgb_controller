@@ -9,6 +9,7 @@
 
 const char* WIFI_SSID_KEY = "wifi_ssid";
 const char* WIFI_PASS_KEY = "wifi_pass";
+const char* BOOT_COUNTER = "boot_counter";
 
 static void connect_wifi(char *ssid, char *password)
 {
@@ -17,10 +18,29 @@ static void connect_wifi(char *ssid, char *password)
     wifi_mgmr_sta_connect(wifi_interface, ssid, password, NULL, NULL, 0, 0);
 }
 
+void check_for_reset() {
+    char* boot_counter = get_saved_value(BOOT_COUNTER);
+    if(boot_counter == NULL) {
+        set_saved_value(BOOT_COUNTER, "1");
+    } else {
+        int boot_count = atoi(boot_counter);
+        boot_count++;
+        if(boot_count >= 3) {
+            clean_saved_value(WIFI_SSID_KEY);
+            clean_saved_value(WIFI_PASS_KEY);
+        }
+        char boot_count_str[2];
+        snprintf(boot_count_str, sizeof(boot_count_str), "%d", boot_count);
+        set_saved_value(BOOT_COUNTER, boot_count_str);
+    }
+    vTaskDelay(2000);
+    clean_saved_value(BOOT_COUNTER);
+}
+
 void handle_connection(void *pvParameters) {
-    vTaskDelay(500);
     while (1) {
         if(finished_init) {
+            check_for_reset();
             char* ssid = get_saved_value(WIFI_SSID_KEY);
             char* pass = get_saved_value(WIFI_PASS_KEY);
             if (ssid != NULL && pass != NULL) {
@@ -35,7 +55,7 @@ void handle_connection(void *pvParameters) {
             }
             break;
         }
-        vTaskDelay(1000);
+        vTaskDelay(100);
     }
     puts("Custom task end");
     vTaskDelete(NULL);

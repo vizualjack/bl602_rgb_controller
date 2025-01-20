@@ -10,9 +10,11 @@ export PROJECT_PATH PROJECT_BOARD
 #CONFIG_TOOLPREFIX :=
 
 HTML = page.html
+JS = script.js
 HEADER = page.c
 BUILD_COUNTER = build_counter
 HTML_FILE_PATH := $(PROJECT_PATH)/$(PROJECT_NAME)/$(HTML)
+JS_FILE_PATH := $(PROJECT_PATH)/$(PROJECT_NAME)/$(JS)
 HEADER_FILE_PATH := $(PROJECT_PATH)/$(PROJECT_NAME)/$(HEADER)
 BUILD_COUNTER_PATH := $(PROJECT_PATH)/$(PROJECT_NAME)/$(BUILD_COUNTER)
 PREV_BUILD_COUNTER := $(shell [ -f $(BUILD_COUNTER_PATH) ] && cat $(BUILD_COUNTER_PATH) || echo 0)
@@ -26,6 +28,9 @@ $(HEADER):
 	@echo 'const char *html_page = "\' > $(HEADER_FILE_PATH)
 	@sed 's/"/\\"/g; s/$$/\\/' $(HTML_FILE_PATH) >> $(HEADER_FILE_PATH)
 	@sed -i "s/%BUILD_COUNT%/$(CUR_BUILD_COUNTER)/" $(HEADER_FILE_PATH)
+	@echo '";' >> $(HEADER_FILE_PATH)
+	@echo 'const char *js_script = "\' >> $(HEADER_FILE_PATH)
+	@sed 's/"/\\"/g; s/$$/\\/' $(JS_FILE_PATH) >> $(HEADER_FILE_PATH)
 	@echo '";' >> $(HEADER_FILE_PATH)
 
 -include ./proj_config.mk

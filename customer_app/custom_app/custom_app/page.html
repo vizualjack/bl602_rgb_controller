@@ -8,36 +8,89 @@
         body {
             font-family: Arial, sans-serif;
             margin: 2em;
+            background: linear-gradient(0deg, rgb(91, 0, 176) 0%, rgb(4, 0, 74) 100%);
+            color: white;
         }
         .container {
             max-width: 500px;
-            margin: 0 auto;
+            margin: 20px auto;
             padding: 2em;
-            border: 1px solid #ddd;
+            /* border: 1px solid #ddd; */
             border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.50);
         }
         h1 {
             font-size: 1.5em;
             text-align: center;
         }
         input[type="file"] {
-            display: block;
-            margin: 1em 0;
-        }
-        button {
+            opacity: 0;
+            position: absolute;
             display: block;
             width: 100%;
+            height: 100%;
+        }
+        #firmwareFileViewer {
+            margin: 1em auto;
+            max-width: 300px;
+            height: 100px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background-color: rgba(0, 0, 0, 0.259);
+        }
+        input[type="text"], input[type="password"] {
+            background-color: rgba(0, 0, 0, 0.259);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 0.75em;
+            width: 300px;
+        }
+        label {
+            display: inline-block;
+            width: 100px;
+            margin-right: 5px;
+            text-align: right;
+        }
+        button {
+            /* width: 100%; */
             padding: 0.7em;
             font-size: 1em;
             color: #fff;
-            background-color: #007bff;
+            background-color: #007bff1b;
             border: none;
             border-radius: 4px;
             cursor: pointer;
         }
+        button[type="submit"] {
+            width: 50%;
+            margin: 0 auto;
+            display: block;
+        }
         button:hover {
-            background-color: #0056b3;
+            background-color: #007bff59;
+        }
+        .oneline {
+            margin: 10px 0;
+            padding-right: 75px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .oneline button {
+            margin-left: 10px;
+        }
+        select {
+            background-color: rgba(0, 0, 0, 0.259);
+            color: white;
+            padding: 0.75em;
+            border: none;
+            border-radius: 10px;
+        }
+        #build {
+            text-align: center;
         }
     </style>
     <script>
@@ -61,8 +114,10 @@
     <div class="container">
         <h2>Firmware Upload</h2>
         <form id="uploadForm" action="/ota" method="POST" enctype="multipart/form-data">
-            <label for="firmwareFile">Select Firmware File:</label>
-            <input type="file" id="firmwareFile" name="file" accept=".bin.xz" required>
+            <div id="firmwareFileViewer">
+                <input type="file" id="firmwareFile" name="file" accept=".bin.xz" required>
+                <span id="firmwareFileName">Please drop a file</span>
+            </div>
             <button type="submit">Upload Firmware</button>
         </form>
         <p id="statusMessage" style="text-align: center; margin-top: 1em;"></p>
@@ -70,40 +125,69 @@
 
     <div class="container">
         <h2>Wifi settings</h2>
+        <span>You can reset this by turning off the device and start/stop it three times.</span>
         <form id="wifi-settings" action="/wifi" method="POST" enctype="multipart/form-data">
-            <label for="ssid">SSID:</label>
-            <input type="text" id="ssid" name="ssid" required/>
-            <label for="pass">Password:</label>
-            <input type="password" id="pass" name="pass" required/>
-            <button type="submit">Send wifi settings</button>
+            <div class="oneline">
+                <label for="ssid">SSID:</label>
+                <input type="text" id="ssid" name="ssid" required/>
+            </div>
+            <div class="oneline">
+                <label for="pass">Password:</label>
+                <input type="password" id="pass" name="pass" required/>
+            </div>
+            <button type="submit">Set wifi settings</button>
         </form>
     </div>
 
     <div class="container">
         <h2>Pin to color mapping</h2>
         <form id="pwm-start" action="/pin_mapping" method="POST" enctype="multipart/form-data">
-            <span>You can turn the pins high / low state to see which color is on that pin. Please map the letters r,g,b and w (if needed) to the pins.</span>
-            <div class="pin-config">
+            <span>Please map the colors to the pins. You can turn the pins high / low state to see which color is on that pin. </span>
+            <div class="oneline">
                 <label for="p0">Pin 0:</label>
-                <input type="text" id="p0" name="p0" maxlength="1" placeholder="r/g/b/w"/>
+                <select id="p0" name="p0">
+                    <option value=""></option>
+                    <option value="r">Red</option>
+                    <option value="g">Green</option>
+                    <option value="b">Blue</option>
+                    <option value="w">White</option>
+                </select>
                 <button onclick="setPinHigh(event,0)">Set high</button>
                 <button onclick="setPinLow(event,0)">Set low</button>
             </div>
-            <div class="pin-config">
+            <div class="oneline">
                 <label for="p1">Pin 1:</label>
-                <input type="text" id="p1" name="p1" maxlength="1" placeholder="r/g/b/w"/>
+                <select id="p1" name="p1">
+                    <option value=""></option>
+                    <option value="r">Red</option>
+                    <option value="g">Green</option>
+                    <option value="b">Blue</option>
+                    <option value="w">White</option>
+                </select>
                 <button onclick="setPinHigh(event,1)">Set high</button>
                 <button onclick="setPinLow(event,1)">Set low</button>
             </div>
-            <div class="pin-config">
+            <div class="oneline">
                 <label for="p2">Pin 2:</label>
-                <input type="text" id="p2" name="p2" maxlength="1" placeholder="r/g/b/w"/>
+                <select id="p2" name="p2">
+                    <option value=""></option>
+                    <option value="r">Red</option>
+                    <option value="g">Green</option>
+                    <option value="b">Blue</option>
+                    <option value="w">White</option>
+                </select>
                 <button onclick="setPinHigh(event,2)">Set high</button>
                 <button onclick="setPinLow(event,2)">Set low</button>
             </div>
-            <div class="pin-config">
+            <div class="oneline">
                 <label for="p3">Pin 3:</label>
-                <input type="text" id="p3" name="p3" maxlength="1" placeholder="r/g/b/w"/>
+                <select id="p3" name="p3">
+                    <option value=""></option>
+                    <option value="r">Red</option>
+                    <option value="g">Green</option>
+                    <option value="b">Blue</option>
+                    <option value="w">White</option>
+                </select>
                 <button onclick="setPinHigh(event,3)">Set high</button>
                 <button onclick="setPinLow(event,3)">Set low</button>
             </div>
@@ -118,36 +202,7 @@
             <button type="submit">Reboot</button>
         </form>
     </div>
-    <span>Build %BUILD_COUNT%</span>
-
-    <script>
-        const form = document.getElementById('uploadForm');
-        const statusMessage = document.getElementById('statusMessage');
-
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault(); // Prevent default form submission
-
-            // Show a loading message
-            statusMessage.textContent = 'Uploading firmware... Please wait.';
-
-            const formData = new FormData(form);
-
-            try {
-                const response = await fetch('/ota', {
-                    method: 'POST',
-                    body: firmwareFile.files[0],
-                });
-
-                if (response.ok) {
-                    statusMessage.textContent = 'Firmware uploaded successfully! The device will reboot.';
-                } else {
-                    statusMessage.textContent = 'Failed to upload firmware. Please try again.';
-                }
-            } catch (error) {
-                console.error('Upload error:', error);
-                statusMessage.textContent = 'An error occurred. Please check your connection and try again.';
-            }
-        });
-    </script>
+    <p id="build">Build %BUILD_COUNT%</p>
+    <script src="script.js"></script>
 </body>
 </html>

@@ -23,3 +23,7 @@ int get_value_length(const char* value) {
 void set_saved_value(const char* key, const char* value) {
     ef_set_env_blob(key, value, get_value_length(value));
 }
+
+void clean_saved_value(const char* key) {
+    ef_del_env(key);
+}
