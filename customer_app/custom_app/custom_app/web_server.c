@@ -24,7 +24,7 @@ void trigger_delayed_reboot() {
     sys_thread_new("rebooter", rebooter, NULL, 512, 29);
 }
 
-void handle_get_requests(struct netconn *conn, const char* buffer) {
+void handle_get_requests(struct netconn *conn, const char* initial_data) {
     const char *response =
             "HTTP/1.1 200 OK\r\n"
             "Content-Type: text/html\r\n"
@@ -201,26 +201,10 @@ void handle_get_requests(struct netconn *conn, const char* buffer) {
 //     // if (http_rest_post_flash(conn, content_length) != ERR_OK) {
 // }
 
-void handle_post_ota(struct netconn *conn, const char* buffer, int buffer_length)
+void handle_ota_update(struct netconn* conn, int content_length, const char* initial_body, struct netbuf** inbuf)
 {
-    int content_length;
-    char *content_length_str = strstr(buffer, "Content-Length:");
-    if (content_length_str) {
-        sscanf(content_length_str, "Content-Length: %d", &content_length);
-        printf("[OTA] Content-Length header found: %d\n", content_length);
-    } else {
-        puts("Content-Length header not found\n");
-        const char *error_response =
-            "HTTP/1.1 500 Internal Server Error\r\n"
-            "Connection: close\r\n\r\n"
-            "Can't content-length header. Please try again!";
-        netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
-        return;
-    }
-
-	int ret;
 	bl_mtd_handle_t handle;
-
+	int ret;
 	ret = bl_mtd_open(BL_MTD_PARTITION_NAME_FW_DEFAULT, &handle, BL_MTD_OPEN_FLAG_BACKUP);
 	if(ret)
 	{
@@ -232,18 +216,12 @@ void handle_post_ota(struct netconn *conn, const char* buffer, int buffer_length
         netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
         return;
 	}
-
 	unsigned int flash_offset, ota_addr;
 	uint32_t bin_size;
-	uint8_t activeID;
+	uint8_t activeID = hal_boot2_get_active_partition();
 	HALPartition_Entry_Config ptEntry;
-
-	activeID = hal_boot2_get_active_partition();
-
-
 	if(hal_boot2_get_active_entries(BOOT2_PARTITION_TYPE_FW, &ptEntry))
 	{
-		// vPortFree(recv_buffer);
 		bl_mtd_close(handle);
         puts("PtTable_Get_Active_Entries fail\r\n");
         const char *error_response =
@@ -255,7 +233,6 @@ void handle_post_ota(struct netconn *conn, const char* buffer, int buffer_length
 	}
 	ota_addr = ptEntry.Address[!ptEntry.activeIndex];
 	bin_size = ptEntry.maxLen[!ptEntry.activeIndex];
-
     if(content_length >= bin_size)
     {
         puts("BIN file is too big");
@@ -273,17 +250,13 @@ void handle_post_ota(struct netconn *conn, const char* buffer, int buffer_length
 	while(erase_offset < bin_size)
 	{
 		erase_len = bin_size - erase_offset;
-		if(erase_len > 0x10000)
-		{
-			erase_len = 0x10000; //Erase in 64kb chunks
-		}
+		if(erase_len > 0x10000) erase_len = 0x10000; //Erase in 64kb chunks
 		bl_mtd_erase(handle, erase_offset, erase_len);
 		erase_offset += erase_len;
         sys_msleep(200);
 	}
 	printf("[OTA] Flash erased\r\n");
 	printf("[OTA] Flashing new firmware\r\n");
-    struct netbuf* inbuf = netbuf_new();
     char* buf;
     u16_t buflen;
     int remaining = content_length;
@@ -296,21 +269,24 @@ void handle_post_ota(struct netconn *conn, const char* buffer, int buffer_length
     int highest_buffer = 0;
     int last_buffer_size = 0;
     while (remaining > 0) {
-        // if(last_buffer_size > highest_buffer) highest_buffer = last_buffer_size;
-        // else if (last_buffer_size < highest_buffer && remaining < 1000) {
-        //     puts("Guess i'm done\n");
-        //     break;
-        // }
         if(!initial_buffer_handled) {
             // recv_err = ERR_OK;
-            puts("[OTA] Set initial buffer to handling buffer + buffer length\n");
-            buf = (char*) buffer;
-            buflen = buffer_length;
+            puts("[OTA] Set initial buffer to handling initial_body\n");
+            buf = (char*) initial_body;
+            buflen = strlen(initial_body);
+            printf("[OTA] initial_body length: %d\n", buflen);
             initial_buffer_handled = true;
+            char* file_start = strstr(buf, "\r\n\r\n");
+            if(file_start == NULL) {
+                puts("[OTA] inital_body has no file start, skip this\n");
+                continue;
+            }
         } else {
+            puts("[OTA] Deleting current inbuf\n");
+            netbuf_delete(*inbuf);
             puts("[OTA] Receiving next data\n");
-            err_t recv_err = netconn_recv(conn, &inbuf);
-            if(recv_err == ERR_OK) recv_err = netbuf_data(inbuf, (void **)&buf, &buflen);
+            err_t recv_err = netconn_recv(conn, inbuf);
+            if(recv_err == ERR_OK) recv_err = netbuf_data(*inbuf, (void **)&buf, &buflen);
             if(recv_err != ERR_OK) buf = NULL;
         }
         if (buf != NULL) {
@@ -318,7 +294,7 @@ void handle_post_ota(struct netconn *conn, const char* buffer, int buffer_length
             printf("%s\n", buf);
             puts("=================\n");
             raw_total += buflen;
-            last_buffer_size = buflen;
+            // last_buffer_size = buflen;
             printf("raw_total: %d\n", raw_total);
             printf("content_length: %d\n", content_length);
             remaining -= buflen;
@@ -338,7 +314,7 @@ void handle_post_ota(struct netconn *conn, const char* buffer, int buffer_length
                         "Connection: close\r\n\r\n"
                         "Can't find start of request. Please try again!";
                     netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
-                    netbuf_delete(inbuf);
+                    // netbuf_delete(inbuf);
                     // if(initial_buffer_handled) netbuf_delete(inbuf);
                     return;
                 }
@@ -348,7 +324,7 @@ void handle_post_ota(struct netconn *conn, const char* buffer, int buffer_length
             data_end = strstr(buf, "\r\n------");
             if(data_end != NULL) {
                 buflen = (data_end - buf);
-                printf("[OTA] Found data end, last frame total bytes are %td\r\n", data_end - buf);
+                printf("[OTA] Found data end, last frame total bytes are %td\r\n", buflen);
             }
             bl_mtd_write(handle, flash_offset, buflen, (u_int8_t*)buf);
             flash_offset += buflen;
@@ -375,20 +351,20 @@ void handle_post_ota(struct netconn *conn, const char* buffer, int buffer_length
 	hal_boot2_update_ptable(&ptEntry);
 	puts("[OTA] Flashed\r\n");
 	bl_mtd_close(handle);
+    puts("[OTA] Sending response...\r\n");
     const char *success_response =
         "HTTP/1.1 200 OK\r\n"
         "Connection: close\r\n\r\n"
         "Firmware uploaded successfully.";
-    puts("[OTA] Sending response...\r\n");
     netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
-    if(inbuf == NULL) netbuf_delete(inbuf);
+    // if(inbuf == NULL) netbuf_delete(inbuf);
     trigger_delayed_reboot();
 }
 
-void handle_wifi_settings(struct netconn *conn, const char* buffer) {
+void handle_wifi_settings(struct netconn *conn, const char* body) {
     puts("[httpd_handler] Handling wifi settings request...\n");
     // SSID
-    char* ssid_start = strstr(buffer, "name=\"ssid\"\r\n\r\n");
+    char* ssid_start = strstr(body, "name=\"ssid\"\r\n\r\n");
     ssid_start += 15;
     if(ssid_start == NULL) {
         puts("Can't find SSID");
@@ -455,49 +431,26 @@ void handle_wifi_settings(struct netconn *conn, const char* buffer) {
     // free(body);
 }
 
-void handle_pin_set_state(struct netconn *conn, const char* buffer) {
-    // char* body = malloc(content_length + 1);
-    // char* body_start = strstr(buf, "\r\n\r\n");
-    // body_start += 4;
-    // char* body_end = buf + buflen;
-    // int total_length = body_end - body_start;
-    // printf("Total length: %i\r\n", total_length);
-    // memcpy(body, body_start, total_length);
-    // body[content_length] = '\0';
-    char* start = strstr(buffer, "name=\"pin\"\r\n\r\n");
+void handle_pin_set_state(struct netconn *conn, const char* initial_data, const char* body) {
+    char* start = strstr(body, "name=\"pin\"\r\n\r\n");
     start += 14;
     int channel_index = atoi(start);
-    bool setHigh = strncmp(buffer, "POST /set_pin_high", 18) == 0;
+    bool setHigh = strncmp(initial_data, "POST /set_pin_high", 18) == 0;
     set_channel_duty(channel_index, setHigh ? 100 : 0);
 }
 
-void handle_pin_mapping(struct netconn *conn, const char* buffer) {
-    // char* body = malloc(content_length + 1);
-    // char* body_start = strstr(buf, "\r\n\r\n");
-    // body_start += 4;
-    // char* body_end = buf + buflen;
-    // int total_length = body_end - body_start;
-    // printf("Total length: %i\r\n", total_length);
-    // memcpy(body, body_start, total_length);
-    // netbuf_delete(inbuf);
-    // if (netconn_recv(conn, &inbuf) == ERR_OK) {
-    //     puts("Got additional data\r\n");
-    //     netbuf_data(inbuf, (void **)&buf, &buflen);
-    //     printf("Additional data length: %i\r\n", buflen);
-    //     memcpy(body + total_length, buf, buflen);
-    // }
-    // body[content_length] = '\0';
+void handle_pin_mapping(struct netconn *conn, const char* body) {
     char colors[5] = {'-', '-', '-', '-', '\0'};
-    char* start = strstr(buffer, "name=\"p0\"\r\n\r\n");
+    char* start = strstr(body, "name=\"p0\"\r\n\r\n");
     start += 13;
     if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[0] = start[0];
-    start = strstr(buffer, "name=\"p1\"\r\n\r\n");
+    start = strstr(body, "name=\"p1\"\r\n\r\n");
     start += 13;
     if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[1] = start[0];
-    start = strstr(buffer, "name=\"p2\"\r\n\r\n");
+    start = strstr(body, "name=\"p2\"\r\n\r\n");
     start += 13;
     if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[2] = start[0];
-    start = strstr(buffer, "name=\"p3\"\r\n\r\n");
+    start = strstr(body, "name=\"p3\"\r\n\r\n");
     start += 13;
     if(start[0] == 'r' || start[0] == 'g' || start[0] == 'b' || start[0] == 'w') colors[3] = start[0];
     for(int i = 0; i < 4; i++) {
@@ -527,32 +480,13 @@ int get_color_value_from_json(const char* json, char color_key) {
     return val;
 }
 
-void handle_new_duty(struct netconn *conn, const char* buffer) {
-    // char* body = malloc(content_length + 1);
-    // char* body_start = strstr(buf, "\r\n\r\n");
-    // body_start += 4;
-    // char* body_end = buf + buflen;
-    // int total_length = body_end - body_start;
-    // printf("Total length: %i\r\n", total_length);
-    // if(total_length > 0) memcpy(body, body_start, total_length);
-    // if (total_length == 0) {
-    //     struct netbuf *inbuf;
-    //     if (netconn_recv(conn, &inbuf) == ERR_OK) {
-    //         puts("Got additional data\r\n");
-    //         netbuf_data(inbuf, (void **)&buf, &buflen);
-    //         printf("Additional data length: %i\r\n", buflen);
-    //         memcpy(body + total_length, buf, buflen);
-    //         netbuf_delete(inbuf);
-    //     }
-    // }
-    // body[content_length] = '\0';
-    // printf("Body: %s\r\n", body);
+void handle_new_duty(struct netconn *conn, const char* body) {
     int r, g, b, w;
-    r = get_color_value_from_json(buffer, 'r');
-    g = get_color_value_from_json(buffer, 'g');
-    b = get_color_value_from_json(buffer, 'b');
-    w = get_color_value_from_json(buffer, 'w');
-    // printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
+    r = get_color_value_from_json(body, 'r');
+    g = get_color_value_from_json(body, 'g');
+    b = get_color_value_from_json(body, 'b');
+    w = get_color_value_from_json(body, 'w');
+    printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
     set_rgbw_duty(r, g, b, w);
     const char *response =
         "HTTP/1.1 200 OK\r\n"
@@ -560,10 +494,9 @@ void handle_new_duty(struct netconn *conn, const char* buffer) {
         "Connection: close\r\n\r\n"
         "Successfully changed color";
     netconn_write(conn, response, strlen(response), NETCONN_COPY);
-    // free(body);
 }
 
-void handle_rebooting(struct netconn *conn, const char* buffer) {
+void handle_rebooting(struct netconn *conn, const char* body) {
     puts("[httpd_handler] Rebooting...\n");
     const char *response =
         "HTTP/1.1 200 OK\r\n"
@@ -574,174 +507,181 @@ void handle_rebooting(struct netconn *conn, const char* buffer) {
     trigger_delayed_reboot();
 }
 
-void handle_post_requests(struct netconn *conn, const char* buffer) {
-    puts("[httpd_handler] Handling POST request...\n");
-    if (strncmp(buffer, "POST /wifi", 10) == 0) {
-        handle_wifi_settings(conn, buffer);
+bool handle_special_cases(struct netconn* conn, const char* inital_data, const char* inital_body, struct netbuf** inbuf, int content_length) {
+    bool handled = false;
+    if(strstr(inital_data, "POST /ota") != NULL) {
+        handle_ota_update(conn, content_length, inital_body, inbuf);
+        handled = true;
     }
-    else if (strncmp(buffer, "POST /set_pin_high", 18) == 0 || strncmp(buffer, "POST /set_pin_low", 17) == 0) {
-        handle_pin_set_state(conn, buffer);
-    }
-    else if (strncmp(buffer, "POST /pin_mapping", 17) == 0) {
-        handle_pin_mapping(conn, buffer);
-    }
-    else if (strncmp(buffer, "POST /new_duty", 14) == 0) {
-        handle_new_duty(conn, buffer);
-    }
-    else if (strncmp(buffer, "POST /reboot", 12) == 0) {
-        handle_rebooting(conn, buffer);
-    } 
+    return handled;
 }
 
-#define MAX_BUFFER_SIZE 1024
-err_t httpd_handler(struct netconn *conn) {
-    static char buffer[MAX_BUFFER_SIZE];
-    struct netbuf *inbuf;
-    char *buf;
-    u16_t buflen;
-    int total_length = 0;
+#define MAX_BODY_SIZE 1024
+void handle_post_requests(struct netconn* conn, const char* inital_data, struct netbuf** inbuf) {
+    puts("[httpd_handler] Handling POST request...\n");
+    // Get content length
+    char *content_length_str = strstr(inital_data, "Content-Length:");
+    if (!content_length_str) {
+        puts("Content-Length header not found\n");
+        const char *response =
+            "HTTP/1.1 500 Internal error\r\n"
+            "Content-Type: text/plain\r\n"
+            "Connection: close\r\n\r\n"
+            "Content-Length header not found";
+        netconn_write(conn, response, strlen(response), NETCONN_COPY);
+        return;
+    } 
     int content_length = 0;
-    bool already_handled = false;
-    err_t error = ERR_OK;
-    // Clean the buffer
-    memset(buffer, 0, sizeof(buffer));
-    // Receive whole HTTP request
-    while (netconn_recv(conn, &inbuf) == ERR_OK) {
-        netbuf_data(inbuf, (void **)&buf, &buflen);
-        memcpy(buffer + total_length, buf, buflen);
-        total_length += buflen;
-        // special case (ota cause of bigger data)
-        if(strncmp(buffer, "POST /ota", 9) == 0) {
-            handle_post_ota(conn, buffer, buflen);
-            already_handled = true;
-            netbuf_delete(inbuf);
-            break;
-        }
-        if(content_length == 0) {
-            char *content_length_str = strstr(buffer, "Content-Length:");
-            if (content_length_str) {
-                sscanf(content_length_str, "Content-Length: %d", &content_length);
-                printf("Content-Length header found: %d\n", content_length);
-                // printf("buffer: %s\n", buffer);
-                // printf("buflen: %d\n", buflen);
-                char* body_start = strstr(buffer, "\r\n\r\n");
-                if(body_start) {
-                    // puts("Body start found\r\n");
-                    body_start += 4;
-                    int skipped_bytes = body_start - (char*)&buffer;
-                    int body_len = buflen - skipped_bytes;
-                    if(body_len == content_length) break;
-                }
-            } else {
-                puts("Content-Length header not found\n");
-                netbuf_delete(inbuf);
-                break;
-            }
-        }
-        if(content_length > MAX_BUFFER_SIZE) {
+    sscanf(content_length_str, "Content-Length: %d", &content_length);
+    // Got content length
+    printf("Content-Length header found: %d\n", content_length);
+    // Get initial body
+    char* body = strstr(inital_data, "\r\n\r\n");
+    if(!body) {
+        netbuf_delete(*inbuf);
+        if(netconn_recv(conn, inbuf) != ERR_OK) {
             const char *response =
-                "HTTP/1.1 200 OK\r\n"
-                "Content-Type: text/html\r\n"
-                "Connection: close\r\n\r\n";
+                "HTTP/1.1 500 Internal error\r\n"
+                "Content-Type: text/plain\r\n"
+                "Connection: close\r\n\r\n"
+                "Initial body request failed";
             netconn_write(conn, response, strlen(response), NETCONN_COPY);
-            netbuf_delete(inbuf);
-            error = ERR_ARG;
-            break;
+            return;
         }
-        netbuf_delete(inbuf);
-    }
-    // buffer[total_length] = '\0'; / should be useless because of memset
-    if (!already_handled && error == ERR_OK) {
-        // Check if the request is a POST (for file upload)
-        if (strncmp(buf, "POST ", 5) == 0) {
-            handle_post_requests(conn, buffer);
-        } else {
-            handle_get_requests(conn, buffer);
+        char* data;
+        u16_t datalen;
+        if(netbuf_data(*inbuf, (void**)&data, &datalen) != ERR_OK) {
+            const char *response =
+                "HTTP/1.1 500 Internal error\r\n"
+                "Content-Type: text/plain\r\n"
+                "Connection: close\r\n\r\n"
+                "Can't get inital body data";
+            netconn_write(conn, response, strlen(response), NETCONN_COPY);
+            return;
         }
+        body = strstr(data, "\r\n\r\n");
     }
-    netbuf_delete(inbuf);
-    return error;
+    if(!body) {
+        const char *response =
+            "HTTP/1.1 500 Internal error\r\n"
+            "Content-Type: text/plain\r\n"
+            "Connection: close\r\n\r\n"
+            "No body";
+        netconn_write(conn, response, strlen(response), NETCONN_COPY);
+        return;
+    }
+    body += 4;
+    if(handle_special_cases(conn, inital_data, body, inbuf, content_length)) return;
+    // Getting total body
+    if(content_length > MAX_BODY_SIZE) {
+        const char *response =
+            "HTTP/1.1 500 Internal error\r\n"
+            "Content-Type: text/plain\r\n"
+            "Connection: close\r\n\r\n"
+            "Body is too large";
+        netconn_write(conn, response, strlen(response), NETCONN_COPY);
+        return;
+    }
+    char body_content[MAX_BODY_SIZE];
+    int current_body_size = strlen(body);
+    memcpy(body_content, body, current_body_size);
+    while(current_body_size < content_length) {
+        netbuf_delete(*inbuf);
+        if(netconn_recv(conn, inbuf) != ERR_OK) {
+            const char *response =
+                "HTTP/1.1 500 Internal error\r\n"
+                "Content-Type: text/plain\r\n"
+                "Connection: close\r\n\r\n"
+                "Can't get receive additional data";
+            netconn_write(conn, response, strlen(response), NETCONN_COPY);
+            return;
+        }
+        char* data;
+        u16_t datalen;
+        if(netbuf_data(*inbuf, (void**)&data, &datalen) != ERR_OK) {
+            const char *response =
+                "HTTP/1.1 500 Internal error\r\n"
+                "Content-Type: text/plain\r\n"
+                "Connection: close\r\n\r\n"
+                "Can't get additional data";
+            netconn_write(conn, response, strlen(response), NETCONN_COPY);
+            return;
+        }
+        memcpy(body_content + current_body_size, data, datalen);
+        current_body_size += datalen;
+    }
+    puts("Got total body\n");
+    memset(body_content, 0, MAX_BODY_SIZE);
+    printf("Body: %s\n", body_content);
+    if (strstr(inital_data, "POST /wifi") != NULL) {
+        handle_wifi_settings(conn, body_content);
+    }
+    else if (strstr(inital_data, "POST /set_pin_high") != NULL || strstr(inital_data, "POST /set_pin_low") != NULL) {
+        handle_pin_set_state(conn, inital_data, body_content);
+    }
+    else if (strstr(inital_data, "POST /pin_mapping") != NULL) {
+        handle_pin_mapping(conn, body_content);
+    }
+    else if (strstr(inital_data, "POST /new_duty") != NULL) {
+        handle_new_duty(conn, body_content);
+    }
+    else if (strstr(inital_data, "POST /reboot") != NULL) {
+        handle_rebooting(conn, body_content);
+    } 
+}
+void httpd_handler(struct netconn *conn) {
+    struct netbuf *inbuf;
+    err_t error = netconn_recv(conn, &inbuf);
+    if(error != ERR_OK) {
+        const char *response =
+            "HTTP/1.1 500 Internal error\r\n"
+            "Content-Type: text/plain\r\n"
+            "Connection: close\r\n\r\n"
+            "Can't handle inital request";
+        netconn_write(conn, response, strlen(response), NETCONN_COPY);
+        return;
+    }
+    char* inital_data;
+    u16_t inital_data_length;
+    error = netbuf_data(inbuf, (void**)&inital_data, &inital_data_length);
+    if(error != ERR_OK) {
+        const char *response =
+            "HTTP/1.1 500 Internal error\r\n"
+            "Content-Type: text/plain\r\n"
+            "Connection: close\r\n\r\n"
+            "Can't get initial data";
+        netconn_write(conn, response, strlen(response), NETCONN_COPY);
+        return;
+    }
+    if(strstr(inital_data, "GET") != NULL) {
+        handle_get_requests(conn, inital_data);
+    }
+    else { // only post is left
+        handle_post_requests(conn, inital_data, &inbuf);
+    }
+    netbuf_delete(inbuf); // Closing last netbuf i got
 }
 
 // Start the HTTP server
 void http_server(void *pvParameters) {
     struct netconn *conn, *newconn;
-    struct netbuf* inbuf;
-    char* data_buffer;
-    u16_t datalen;
     puts("[http_server] Starting...\r\n");
     // Create a new TCP connection
     conn = netconn_new(NETCONN_TCP);
     netconn_bind(conn, IP_ADDR_ANY, 80);
     netconn_listen(conn);
-
-    puts("[http_server] Listening on port 80......\r\n");
     init_pwm();
-    err_t err;
-    char* my_data_buffer;
-    u16_t my_buf_len = 0;
+    puts("[http_pserver] Listening on port 80......\r\n");
     while (1) {
         // Accept new connections
         if (netconn_accept(conn, &newconn) == ERR_OK) {
-            // httpd_handler(newconn);
             puts("[http_server] New tcp connection established\n");
-            puts("[http_server] netconn_recv\n");
-            err = netconn_recv(newconn, &inbuf);
-            if (err == ERR_OK) {
-                puts("[http_server] netbuf_data\n");
-                err = netbuf_data(inbuf, (void **)&data_buffer, &datalen);
-                if(err == ERR_OK) {
-                    printf("[http_server] datalen: %d\n\n", datalen);
-                    printf("[http_server] data_buffer: %s\r\n\r\n", data_buffer);
-                    if(strstr(data_buffer, "GET") != NULL) {
-                        printf("netbuf_next: %i\n", netbuf_next(inbuf));
-                        puts("[http_server] Sending GET response\n");
-                        const char *get_res =
-                        "HTTP/1.1 200 OK\r\n"
-                        "Content-Type: text/html\r\n"
-                        "Connection: close\r\n\r\n";
-                        netconn_write(newconn, get_res, strlen(get_res), NETCONN_COPY);
-                        netconn_write(newconn, html_page, strlen(html_page), NETCONN_COPY);
-                    }
-                    else {
-                        err = netbuf_data(inbuf, (void**)&my_data_buffer, &my_buf_len);
-                        if(err != ERR_OK) {
-                            puts("Can't get my own data buffer\r\n");
-                            const char *post_req =
-                            "HTTP/1.1 200 OK\r\n"
-                            "Content-Type: text/plain\r\n"
-                            "Connection: close\r\n\r\n"
-                            "Data buffer";
-                            netconn_write(newconn, post_req, strlen(post_req), NETCONN_COPY);
-                        }
-                        printf("my_buf_len: %d\n", my_buf_len);
-                        printf("my_data_buffer: %s\r\n\r\n", my_data_buffer);
-                        printf("netbuf_next: %i\n", netbuf_next(inbuf));
-                        puts("[http_server] Sending POST response\n");
-                        const char *post_req =
-                        "HTTP/1.1 200 OK\r\n"
-                        "Content-Type: text/plain\r\n"
-                        "Connection: close\r\n\r\n"
-                        "Can't handle post requests";
-                        netconn_write(newconn, post_req, strlen(post_req), NETCONN_COPY);
-                    }
-                    printf("[http_server] netbuf_delete\n");
-                    netbuf_delete(inbuf);
-                }
-                else {
-                    printf("Error on netbuf_data: %i\n", err);
-                }
-            } else {
-                printf("Error on netconn_recv: %i\n", err);
-            }
+            puts("[http_server] Handle request\n");
+            httpd_handler(newconn);
             puts("[http_server] Close newconn\n");
             netconn_close(newconn);
             puts("[http_server] Delete newconn\n");
             netconn_delete(newconn);
-            puts("[http_server] Tcp connection closed successfully\n");
-        }
-        else {
-            puts("[http_server] Couldn't establish tcp connection\n");
         }
     }
 }
