@@ -277,8 +277,6 @@ void handle_wifi_settings(struct netconn *conn, const char* body) {
         "Changed wifi settings.";
     netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
     trigger_delayed_reboot();
-    // netbuf_delete(inbuf);
-    // free(body);
 }
 
 void handle_pin_set_state(struct netconn *conn, const char* initial_data, const char* body) {
@@ -355,6 +353,11 @@ void handle_rebooting(struct netconn *conn, const char* body) {
         "Rebooting...";
     netconn_write(conn, response, strlen(response), NETCONN_COPY);
     trigger_delayed_reboot();
+}
+
+void handle_clean_easyflash(struct netconn *conn, const char* body) {
+    puts("[httpd_handler] Cleaning all easyflash values...\n");
+    clean_all_saved_values();
 }
 
 bool handle_special_cases(struct netconn* conn, const char* inital_data, const char* inital_body, int inital_body_length, struct netbuf** inbuf, int content_length) {
@@ -483,6 +486,9 @@ void handle_post_requests(struct netconn* conn, const char* inital_data, int ini
     else if (strstr(inital_data, "POST /reboot") != NULL) {
         handle_rebooting(conn, body_content);
     } 
+    else if (strstr(inital_data, "POST /clean_easyflash") != NULL) {
+        handle_clean_easyflash(conn, body_content);
+    } 
 }
 void httpd_handler(struct netconn *conn) {
     struct netbuf *inbuf;
@@ -519,6 +525,7 @@ void httpd_handler(struct netconn *conn) {
 
 // Start the HTTP server
 void http_server(void *pvParameters) {
+    vTaskDelay(2000);
     struct netconn *conn, *newconn;
     puts("[http_server] Starting...\r\n");
     // Create a new TCP connection

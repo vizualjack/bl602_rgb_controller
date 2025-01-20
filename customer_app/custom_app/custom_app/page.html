@@ -107,6 +107,14 @@
             formData.append("pin", pin);
             fetch("/set_pin_low", {method: "POST", body: formData});
         }
+        
+        function reboot() {
+            fetch("/reboot", {method: "POST"});
+        }
+
+        function cleanEasyflash() {
+            fetch("/clean_easyflash", {method: "POST"});
+        }
     </script>
 </head>
 <body>
@@ -118,7 +126,7 @@
                 <input type="file" id="firmwareFile" name="file" accept=".bin.xz" required>
                 <span id="firmwareFileName">Please drop a file</span>
             </div>
-            <button type="submit">Upload Firmware</button>
+            <button type="submit" id="firmwareAction">Upload</button>
         </form>
         <p id="statusMessage" style="text-align: center; margin-top: 1em;"></p>
     </div>
@@ -195,12 +203,10 @@
         </form>
     </div>
 
-    
     <div class="container">
         <h2>Other actions</h2>
-        <form id="reboot" action="/reboot" method="POST" enctype="multipart/form-data">
-            <button type="submit">Reboot</button>
-        </form>
+        <button onclick="reboot()">Reboot</button>
+        <button onclick="cleanEasyflash()">Clean easyflash</button>
     </div>
     <p id="build">Build %BUILD_COUNT%</p>
     <script src="script.js"></script>

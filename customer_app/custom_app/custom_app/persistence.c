@@ -1,5 +1,7 @@
 #include <easyflash.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 
 char* get_saved_value(const char* key) {
@@ -26,4 +28,38 @@ void set_saved_value(const char* key, const char* value) {
 
 void clean_saved_value(const char* key) {
     ef_del_env(key);
+}
+
+char keys[512] = {0};
+int current_pos = 0;
+bool get_env_keys(env_node_obj_t env, void *arg1, void *arg2) {
+    if(current_pos + env->name_len + 1 > 512) return false;
+    memcpy(keys+current_pos, env->name, env->name_len);
+    current_pos += env->name_len;
+    keys[current_pos] = '\n';
+    current_pos += 1;
+    return false;
+}
+
+void clean_all_saved_values() {
+    puts("Before cleaning:\n");
+    ef_print_env();
+    puts("Getting names...");
+    ef_custom_iterating(get_env_keys);
+    // printf("Keys: %s\n", keys);
+    current_pos = 0;
+    char* start = keys;
+    char* end = strstr(keys, "\n");
+    while(start && end) {
+        *end = '\0';
+        // printf("Key: %s\n", start);
+        clean_saved_value(start);
+        start = end + 1;
+        end = NULL;
+        if(start >= keys + 512) break;
+        end = strstr(start, "\n");
+    }
+    memset(keys, 0, 512);
+    puts("After cleaning:\n");
+    ef_print_env();
 }

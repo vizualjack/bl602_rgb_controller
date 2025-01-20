@@ -53,6 +53,7 @@ EfErrCode ef_set_env_blob(const char *key, const void *value_buf, size_t buf_len
 /* ef_env.c, ef_env_legacy_wl.c and ef_env_legacy.c */
 EfErrCode ef_load_env(void);
 void ef_print_env(void);
+void ef_custom_iterating(bool (*callback)(env_node_obj_t env, void *arg1, void *arg2));
 char *ef_get_env(const char *key);
 EfErrCode ef_set_env(const char *key, const char *value);
 EfErrCode ef_del_env(const char *key);

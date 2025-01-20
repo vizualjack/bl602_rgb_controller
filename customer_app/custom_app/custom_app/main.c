@@ -82,6 +82,7 @@
 #include <utils_log.h>
 #include <libfdt.h>
 #include <blog.h>
+#include <bl602_glb.h>
 
 #include <bl_mtd.h>
 #include "lwip/api.h"
@@ -481,6 +482,11 @@ static void system_init(void)
     tcpip_init(NULL, NULL);
 }
 
+void set_system_clock() {
+    // printf("Clock type: %d", GLB_Get_Root_CLK_Sel());
+    printf("Set clock speed: %d", GLB_Set_System_CLK(GLB_PLL_XTAL_40M, GLB_PLL_CLK_192M));
+}
+
 #define EVENT_LOOP_STACK_SIZE 4096
 #define CONNECTION_TASK_STACK_SIZE 4096
 #define HTTP_SERVER_STACK_SIZE 10240
@@ -502,6 +508,7 @@ void bfl_main()
     printf("Boot2 consumed %lums\r\n", time_main / 1000);
     puts("Starting firmware now....\r\n");
     system_init();
+    set_system_clock();
     // Tasks
     xTaskCreateStatic(event_loop, (char*)"event_loop", EVENT_LOOP_STACK_SIZE, NULL, 15, event_loop_stack, &event_loop_task);
     puts("[OS] Added event_loop task\r\n");
@@ -509,8 +516,8 @@ void bfl_main()
     puts("[OS] Added connection task\r\n");
     xTaskCreateStatic(http_server, (char*)"http_server", HTTP_SERVER_STACK_SIZE, NULL, 15, http_server_task_stack, &http_server_task);
     puts("[OS] Added http server task\r\n");
-    // xTaskCreateStatic(udp_server, (char*)"udp_server", UDP_SERVER_STACK_SIZE, NULL, 15, udp_server_task_stack, &udp_server_task);
-    // puts("[OS] Added udp server task\r\n");
+    xTaskCreateStatic(udp_server, (char*)"udp_server", UDP_SERVER_STACK_SIZE, NULL, 15, udp_server_task_stack, &udp_server_task);
+    puts("[OS] Added udp server task\r\n");
     puts("[OS] Starting OS Scheduler...\r\n");
     vTaskStartScheduler();
 }

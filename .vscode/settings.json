@@ -74,6 +74,7 @@
         "string_view": "c",
         "slist": "c",
         "initializer_list": "c",
-        "valarray": "c"
+        "valarray": "c",
+        "scoped_allocator": "cpp"
     }
 }

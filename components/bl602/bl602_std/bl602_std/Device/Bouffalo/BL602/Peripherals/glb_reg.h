@@ -61,12 +61,12 @@
 #define GLB_REG_BCLK_EN_MSK                                     (((1U<<GLB_REG_BCLK_EN_LEN)-1)<<GLB_REG_BCLK_EN_POS)
 #define GLB_REG_BCLK_EN_UMSK                                    (~(((1U<<GLB_REG_BCLK_EN_LEN)-1)<<GLB_REG_BCLK_EN_POS))
 #define GLB_REG_PLL_SEL                                         GLB_REG_PLL_SEL
-#define GLB_REG_PLL_SEL_POS                                     (4U)
+#define GLB_REG_PLL_SEL_POS                                     (4U) // THIS IS WHAT I NEED TO SET to 3 for 192 MHz
 #define GLB_REG_PLL_SEL_LEN                                     (2U)
 #define GLB_REG_PLL_SEL_MSK                                     (((1U<<GLB_REG_PLL_SEL_LEN)-1)<<GLB_REG_PLL_SEL_POS)
 #define GLB_REG_PLL_SEL_UMSK                                    (~(((1U<<GLB_REG_PLL_SEL_LEN)-1)<<GLB_REG_PLL_SEL_POS))
 #define GLB_HBN_ROOT_CLK_SEL                                    GLB_HBN_ROOT_CLK_SEL
-#define GLB_HBN_ROOT_CLK_SEL_POS                                (6U)
+#define GLB_HBN_ROOT_CLK_SEL_POS                                (6U) // Clock type is here
 #define GLB_HBN_ROOT_CLK_SEL_LEN                                (2U)
 #define GLB_HBN_ROOT_CLK_SEL_MSK                                (((1U<<GLB_HBN_ROOT_CLK_SEL_LEN)-1)<<GLB_HBN_ROOT_CLK_SEL_POS)
 #define GLB_HBN_ROOT_CLK_SEL_UMSK                               (~(((1U<<GLB_HBN_ROOT_CLK_SEL_LEN)-1)<<GLB_HBN_ROOT_CLK_SEL_POS))
