@@ -119,80 +119,44 @@ void handle_ota_update(struct netconn* conn, int content_length, const char* ini
     int last_buffer_size = 0;
     while (remaining > 0) {
         if(!initial_buffer_handled) {
-            // recv_err = ERR_OK;
             puts("[OTA] Set buf to inital_body\n");
-            // if(initial_body_length < 0)
-            // printf("[OTA] initial_body length: %d\n", buflen);
-            buf = (char*) initial_body;
-            buflen = initial_body_length;
-            initial_buffer_handled = true;
-            // if(strlen(initial_body) <= 0) {
-            //     puts("[OTA] inital_body has no content, skip it\n");
-            //     continue;
-            // }
         } else {
-            // puts("[OTA] Deleting current inbuf\n");
+            puts("[OTA] Deleting current inbuf\n");
             netbuf_delete(*inbuf);
-            // puts("[OTA] Receiving next data\n");
-            err_t recv_err = netconn_recv(conn, inbuf);
-            if(recv_err == ERR_OK) recv_err = netbuf_data(*inbuf, (void **)&buf, &buflen);
-            if(recv_err != ERR_OK) buf = NULL;
+            puts("[OTA] Receiving next data\n");
+            if(netconn_recv(conn, inbuf) != ERR_OK) {
+	            bl_mtd_close(handle);
+                puts("[OTA] Can't receive next inbuf\n");
+                const char *error_response =
+                    "HTTP/1.1 500 Internal Server Error\r\n"
+                    "Connection: close\r\n\r\n"
+                    "Error while receiving request. Please try again!";
+                netconn_write(conn, error_response, strlen(error_response), NETCONN_NOCOPY);
+                return;
+            }
         }
-        if (buf != NULL) {
-            // puts("=== Data part ===\n");
-            // printf("%s\n", buf);
-            // puts("=================\n");
+        do {
+            if(!initial_buffer_handled) {
+                buf = (char*)initial_body;
+                buflen = initial_body_length;
+                initial_buffer_handled = true;
+            } else if(netbuf_data(*inbuf, (void **)&buf, &buflen) != ERR_OK) {
+                bl_mtd_close(handle);
+                const char *error_response =
+                    "HTTP/1.1 500 Internal Server Error\r\n"
+                    "Connection: close\r\n\r\n"
+                    "Error while receiving request. Please try again!";
+                netconn_write(conn, error_response, strlen(error_response), NETCONN_NOCOPY);
+                return;
+            }
             raw_total += buflen;
-            // last_buffer_size = buflen;
-            // printf("raw_total: %d\n", raw_total);
-            // printf("content_length: %d\n", content_length);
             remaining -= buflen;
-            // printf("Remaining: %d\n", remaining);
-            // data transmission
-            // if (first) {
-            //     char *before = buf;
-            //     buf = strstr(buf, "\r\n\r\n");
-            //     buf += 4; // Skip past "\r\n\r\n"
-            //     first = false;
-            //     int skipped_bytes = buf - before;
-            //     if(skipped_bytes < 0) {
-            //         puts("Something is totally wrong\r\n");
-            //         bl_mtd_close(handle);
-            //         const char *error_response =
-            //             "HTTP/1.1 500 Internal Server Error\r\n"
-            //             "Connection: close\r\n\r\n"
-            //             "Can't find start of request. Please try again!";
-            //         netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
-            //         // netbuf_delete(inbuf);
-            //         // if(initial_buffer_handled) netbuf_delete(inbuf);
-            //         return;
-            //     }
-            //     buflen -= skipped_bytes;
-            //     printf("[OTA] Found data start, skipping %td bytes\r\n", skipped_bytes);
-            // }
-            // data_end = strstr(buf, "\r\n------");
-            // if(data_end != NULL) {
-            //     buflen = (data_end - buf);
-            //     printf("[OTA] Found data end, last frame total bytes are %td\r\n", buflen);
-            // }
+            printf("Remaining: %d\r\n", remaining);
             bl_mtd_write(handle, flash_offset, buflen, (u_int8_t*)buf);
             flash_offset += buflen;
             total += buflen;
-            // if(initial_buffer_handled) {
-            //     puts("[OTA] deleting buffer\n");
-            //     netbuf_delete(inbuf);
-            // }
-            // else initial_buffer_handled = true;
-        } else {
-            puts("Error receiving additional data\n");
-	        bl_mtd_close(handle);
-            const char *error_response =
-                "HTTP/1.1 500 Internal Server Error\r\n"
-                "Connection: close\r\n\r\n"
-                "Error while receiving request. Please try again!";
-            netconn_write(conn, error_response, strlen(error_response), NETCONN_COPY);
-            return;
-        }
+        } while(netbuf_next(*inbuf) != -1);
+        netbuf_first(*inbuf);
     }
 	printf("[OTA] Flashed new firmware\r\n");
 	printf("[OTA] set OTA partition length\r\n");
@@ -341,7 +305,7 @@ void handle_new_duty(struct netconn *conn, const char* body) {
         "Content-Type: text/html\r\n"
         "Connection: close\r\n\r\n"
         "Successfully changed color";
-    netconn_write(conn, response, strlen(response), NETCONN_COPY);
+    netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
 }
 
 void handle_rebooting(struct netconn *conn, const char* body) {
@@ -351,13 +315,21 @@ void handle_rebooting(struct netconn *conn, const char* body) {
         "Content-Type: text/html\r\n"
         "Connection: close\r\n\r\n"
         "Rebooting...";
-    netconn_write(conn, response, strlen(response), NETCONN_COPY);
+    netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
     trigger_delayed_reboot();
 }
 
 void handle_clean_easyflash(struct netconn *conn, const char* body) {
     puts("[httpd_handler] Cleaning all easyflash values...\n");
-    clean_all_saved_values();
+    char* keys = clean_all_saved_values();
+    const char *response_template =
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Connection: close\r\n\r\n"
+        "Cleaned all values:\n%s\n";
+    char response[250];
+    snprintf(response, sizeof(response), response_template, keys);
+    netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
 }
 
 bool handle_special_cases(struct netconn* conn, const char* inital_data, const char* inital_body, int inital_body_length, struct netbuf** inbuf, int content_length) {
@@ -381,7 +353,7 @@ void handle_post_requests(struct netconn* conn, const char* inital_data, int ini
             "Content-Type: text/plain\r\n"
             "Connection: close\r\n\r\n"
             "Content-Length header not found";
-        netconn_write(conn, response, strlen(response), NETCONN_COPY);
+        netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
         return;
     } 
     int content_length = 0;
@@ -399,7 +371,7 @@ void handle_post_requests(struct netconn* conn, const char* inital_data, int ini
                 "Content-Type: text/plain\r\n"
                 "Connection: close\r\n\r\n"
                 "Initial body request failed";
-            netconn_write(conn, response, strlen(response), NETCONN_COPY);
+            netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
             return;
         }
         char* data;
@@ -410,7 +382,7 @@ void handle_post_requests(struct netconn* conn, const char* inital_data, int ini
                 "Content-Type: text/plain\r\n"
                 "Connection: close\r\n\r\n"
                 "Can't get inital body data";
-            netconn_write(conn, response, strlen(response), NETCONN_COPY);
+            netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
             return;
         }
         body = strstr(data, "\r\n\r\n");
@@ -424,7 +396,7 @@ void handle_post_requests(struct netconn* conn, const char* inital_data, int ini
             "Content-Type: text/plain\r\n"
             "Connection: close\r\n\r\n"
             "No body";
-        netconn_write(conn, response, strlen(response), NETCONN_COPY);
+        netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
         return;
     }
     body += 4;
@@ -437,24 +409,15 @@ void handle_post_requests(struct netconn* conn, const char* inital_data, int ini
             "Content-Type: text/plain\r\n"
             "Connection: close\r\n\r\n"
             "Body is too large";
-        netconn_write(conn, response, strlen(response), NETCONN_COPY);
+        netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
         return;
     }
+    puts("Getting total body\n");
     char body_content[MAX_BODY_SIZE];
     int current_body_size = strlen(body);
-    memset(body_content, 0, MAX_BODY_SIZE);
-    memcpy(body_content, body, current_body_size);
-    while(current_body_size < content_length) {
-        netbuf_delete(*inbuf);
-        if(netconn_recv(conn, inbuf) != ERR_OK) {
-            const char *response =
-                "HTTP/1.1 500 Internal error\r\n"
-                "Content-Type: text/plain\r\n"
-                "Connection: close\r\n\r\n"
-                "Can't get receive additional data";
-            netconn_write(conn, response, strlen(response), NETCONN_COPY);
-            return;
-        }
+    printf("current_body_size: %d\n", current_body_size);
+    while(netbuf_next(*inbuf) != -1) {
+        puts("Getting next inbuf data part...\n");
         char* data;
         u16_t datalen;
         if(netbuf_data(*inbuf, (void**)&data, &datalen) != ERR_OK) {
@@ -463,11 +426,49 @@ void handle_post_requests(struct netconn* conn, const char* inital_data, int ini
                 "Content-Type: text/plain\r\n"
                 "Connection: close\r\n\r\n"
                 "Can't get additional data";
-            netconn_write(conn, response, strlen(response), NETCONN_COPY);
+            netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
             return;
         }
+        puts("Copying data to body_content...\n");
         memcpy(body_content + current_body_size, data, datalen);
         current_body_size += datalen;
+        puts("Copyed data to body_content\n");
+    }
+    puts("Zeroing body_content\n");
+    memset(body_content, 0, MAX_BODY_SIZE);
+    puts("Copy inital body to body_content\n");
+    memcpy(body_content, body, current_body_size);
+    while(current_body_size < content_length) {
+        puts("Deleting prev inbuf...\n");
+        netbuf_delete(*inbuf);
+        puts("Getting new inbuf...\n");
+        if(netconn_recv(conn, inbuf) != ERR_OK) {
+            const char *response =
+                "HTTP/1.1 500 Internal error\r\n"
+                "Content-Type: text/plain\r\n"
+                "Connection: close\r\n\r\n"
+                "Can't get receive additional data";
+            netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
+            return;
+        }
+        puts("Getting new inbuf data...\n");
+        char* data;
+        u16_t datalen;
+        do {
+            if(netbuf_data(*inbuf, (void**)&data, &datalen) != ERR_OK) {
+                const char *response =
+                    "HTTP/1.1 500 Internal error\r\n"
+                    "Content-Type: text/plain\r\n"
+                    "Connection: close\r\n\r\n"
+                    "Can't get additional data";
+                netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
+                return;
+            } 
+            puts("Copying data to body_content...\n");
+            memcpy(body_content + current_body_size, data, datalen);
+            current_body_size += datalen;
+            puts("Copyed data to body_content\n");
+        } while(netbuf_next(*inbuf) != -1);
     }
     puts("Got total body\n");;
     printf("Body: %s\n", body_content);
@@ -499,7 +500,7 @@ void httpd_handler(struct netconn *conn) {
             "Content-Type: text/plain\r\n"
             "Connection: close\r\n\r\n"
             "Can't handle inital request";
-        netconn_write(conn, response, strlen(response), NETCONN_COPY);
+        netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
         return;
     }
     char* inital_data;
@@ -511,7 +512,7 @@ void httpd_handler(struct netconn *conn) {
             "Content-Type: text/plain\r\n"
             "Connection: close\r\n\r\n"
             "Can't get initial data";
-        netconn_write(conn, response, strlen(response), NETCONN_COPY);
+        netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
         return;
     }
     if(strstr(inital_data, "GET") != NULL) {
@@ -537,6 +538,7 @@ void http_server(void *pvParameters) {
     while (1) {
         // Accept new connections
         if (netconn_accept(conn, &newconn) == ERR_OK) {
+            printf("Free heap size: %d\r\n", xPortGetFreeHeapSize());
             puts("[http_server] New tcp connection established\n");
             puts("[http_server] Handle request\n");
             httpd_handler(newconn);
@@ -544,6 +546,7 @@ void http_server(void *pvParameters) {
             netconn_close(newconn);
             puts("[http_server] Delete newconn\n");
             netconn_delete(newconn);
+            puts("[http_server] Tcp connection closed and deleted\n");
         }
     }
 }
