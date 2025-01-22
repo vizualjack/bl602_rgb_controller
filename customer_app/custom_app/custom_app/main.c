@@ -471,6 +471,7 @@ static void system_init(void)
             (unsigned int)&_heap_size, &_heap_start,
             (unsigned int)&_heap_wifi_size, &_heap_wifi_start
     );
+    bl_sys_init();
     blog_init();
     bl_irq_init();
     bl_sec_init();
