@@ -491,6 +491,7 @@ void set_system_clock() {
 #define CONNECTION_TASK_STACK_SIZE 4096
 #define HTTP_SERVER_STACK_SIZE 10240
 #define UDP_SERVER_STACK_SIZE 4096
+#define PWM_CHANGER_STACK_SIZE 1024
 void bfl_main()
 {
     static StackType_t event_loop_stack[EVENT_LOOP_STACK_SIZE];
@@ -501,6 +502,8 @@ void bfl_main()
     static StaticTask_t http_server_task;
     static StackType_t udp_server_task_stack[UDP_SERVER_STACK_SIZE];
     static StaticTask_t udp_server_task;
+    static StackType_t pwm_changer_task_stack[PWM_CHANGER_STACK_SIZE];
+    static StaticTask_t pwm_changer_task;
     
     time_main = bl_timer_now_us();
     
@@ -518,6 +521,9 @@ void bfl_main()
     xTaskCreateStatic(http_server, (char*)"http_server", HTTP_SERVER_STACK_SIZE, NULL, TCPIP_THREAD_PRIO-1, http_server_task_stack, &http_server_task);
     // sys_thread_new("http_server", http_server, NULL, HTTP_SERVER_STACK_SIZE, TCPIP_THREAD_PRIO-2);
     puts("[OS] Added http server task\r\n");
+    // FOR INDIRECT CHANGE VIA HTTP SERVER
+    xTaskCreateStatic(pwm_changer, (char*)"pwm_changer", PWM_CHANGER_STACK_SIZE, NULL, 0, pwm_changer_task_stack, &pwm_changer_task);
+    puts("[OS] Added pvm changer task\r\n");
 
     xTaskCreateStatic(udp_server, (char*)"udp_server", UDP_SERVER_STACK_SIZE, NULL, 15, udp_server_task_stack, &udp_server_task);
     puts("[OS] Added udp server task\r\n");

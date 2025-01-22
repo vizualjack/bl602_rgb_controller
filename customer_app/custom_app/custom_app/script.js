@@ -42,3 +42,22 @@ firmwareSelector.addEventListener("change", () => {
         firmwareFileName.innerHTML = firmwareSelector.files[0].name;
     }
 });
+
+const wifiForm = document.getElementById("wifi-settings");
+const ssidInput = document.getElementById("ssid");
+const passInput = document.getElementById("pass");
+wifiForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    ssidInput.value = ssidInput.value.trim();
+    passInput.value = passInput.value.trim();
+    fetch("/wifi", { method: "POST", body: new FormData(wifiForm)})
+        .catch((err) => alert(err));
+});
+
+
+const pwmForm = document.getElementById("pwm-mapping");
+pwmForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    fetch("/pin_mapping", { method: "POST", body: new FormData(pwmForm)})
+        .catch((err) => alert(err));
+});

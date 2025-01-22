@@ -248,7 +248,7 @@ void handle_pin_set_state(struct netconn *conn, const char* initial_data, const 
     start += 14;
     int channel_index = atoi(start);
     bool setHigh = strncmp(initial_data, "POST /set_pin_high", 18) == 0;
-    set_channel_duty(channel_index, setHigh ? 100 : 0);
+    update_channel_duty(channel_index, setHigh ? 100 : 0);
 }
 
 void handle_pin_mapping(struct netconn *conn, const char* body) {
@@ -299,7 +299,7 @@ void handle_new_duty(struct netconn *conn, const char* body) {
     b = get_color_value_from_json(body, 'b');
     w = get_color_value_from_json(body, 'w');
     printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
-    set_rgbw_duty(r, g, b, w);
+    update_rgbw_duties(r, g, b, w);
     const char *response =
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/html\r\n"
@@ -533,7 +533,6 @@ void http_server(void *pvParameters) {
     conn = netconn_new(NETCONN_TCP);
     netconn_bind(conn, IP_ADDR_ANY, 80);
     netconn_listen(conn);
-    init_pwm();
     puts("[http_pserver] Listening on port 80......\r\n");
     while (1) {
         // Accept new connections
