@@ -9,13 +9,16 @@
 
 const char* WIFI_SSID_KEY = "wifi_ssid";
 const char* WIFI_PASS_KEY = "wifi_pass";
+const char* HOSTNAME_KEY = "hostname";
 const char* BOOT_COUNTER = "boot_counter";
 
 static void connect_wifi(char *ssid, char *password)
 {
-    wifi_interface_t wifi_interface;
-    wifi_interface = wifi_mgmr_sta_enable();
-    wifi_mgmr_sta_connect(wifi_interface, ssid, password, NULL, NULL, 0, 0);
+    wifi_interface_t interface_pointer = wifi_mgmr_sta_enable();
+    wifi_interface* interface = (wifi_interface*) interface_pointer;
+    char* hostname = get_saved_value(HOSTNAME_KEY);
+    if(hostname != NULL) interface->netif.hostname = hostname;
+    wifi_mgmr_sta_connect(interface_pointer, ssid, password, NULL, NULL, 0, 0);
 }
 
 void check_for_reset() {

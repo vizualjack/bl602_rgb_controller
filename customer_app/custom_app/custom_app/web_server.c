@@ -282,6 +282,39 @@ void handle_pin_mapping(struct netconn *conn, const char* body) {
     netconn_write(conn, response, strlen(response), NETCONN_COPY);
 }
 
+void handle_hostname(struct netconn *conn, const char* body) {
+    char* hostname = strstr(body, "name=\"hostname\"\r\n\r\n");
+    if(hostname == NULL) {
+        const char *response =
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/html\r\n"
+            "Connection: close\r\n\r\n"
+            "Can't find hostname";
+        netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
+        return;
+    }
+    hostname += 19;
+    char* hostname_end = strstr(hostname, "\r\n------");
+    if(hostname_end == NULL) {
+        const char *response =
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/html\r\n"
+            "Connection: close\r\n\r\n"
+            "Can't find hostname";
+        netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
+        return;
+    }
+    *hostname_end = '\0';
+    set_saved_value(HOSTNAME_KEY, hostname);
+    const char *response =
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Connection: close\r\n\r\n"
+        "Successfully changed hostname, device is restarting";
+    netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
+    trigger_delayed_reboot();
+}
+
 int get_color_value_from_json(const char* json, char color_key) {
     char search_key[4];
     int val;
@@ -489,7 +522,10 @@ void handle_post_requests(struct netconn* conn, const char* inital_data, int ini
     } 
     else if (strstr(inital_data, "POST /clean_easyflash") != NULL) {
         handle_clean_easyflash(conn, body_content);
-    } 
+    }
+    else if (strstr(inital_data, "POST /hostname") != NULL) {
+        handle_hostname(conn, body_content);
+    }
 }
 void httpd_handler(struct netconn *conn) {
     struct netbuf *inbuf;

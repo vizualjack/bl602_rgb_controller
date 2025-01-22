@@ -511,7 +511,7 @@ void bfl_main()
     printf("Boot2 consumed %lums\r\n", time_main / 1000);
     puts("Starting firmware now....\r\n");
     system_init();
-    set_system_clock();
+    // set_system_clock();
     // Tasks
     xTaskCreateStatic(event_loop, (char*)"event_loop", EVENT_LOOP_STACK_SIZE, NULL, 15, event_loop_stack, &event_loop_task);
     puts("[OS] Added event_loop task\r\n");

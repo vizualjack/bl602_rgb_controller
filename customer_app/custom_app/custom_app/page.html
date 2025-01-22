@@ -147,6 +147,19 @@
         </form>
     </div>
 
+    
+    <div class="container">
+        <h2>Hostname / Device name</h2>
+        <span>Is used as wifi hostname so in your router you see this name instead of the default one.</span>
+        <form id="hostname-settings" action="/hostname" method="POST" enctype="multipart/form-data">
+            <div class="oneline">
+                <label for="hostname">Hostname:</label>
+                <input type="text" id="hostname" name="hostname" required/>
+            </div>
+            <button type="submit">Set hostname</button>
+        </form>
+    </div>
+
     <div class="container">
         <h2>Pin to color mapping</h2>
         <form id="pwm-mapping" action="/pin_mapping" method="POST" enctype="multipart/form-data">

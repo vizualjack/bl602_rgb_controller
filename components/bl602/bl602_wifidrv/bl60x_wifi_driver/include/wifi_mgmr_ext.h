@@ -63,6 +63,25 @@ typedef struct wifi_sta_basic_info {
     uint8_t data_rate;
 } wifi_sta_basic_info_t;
 
+typedef struct wifi_int {
+    int mode;//0: sta; 1: ap
+    uint8_t vif_index;
+    uint8_t mac[6];
+    struct {
+        uint32_t ip;
+        uint32_t mask;
+        uint32_t gw;
+        uint32_t dns1;
+        uint32_t dns2;
+    } ipv4;
+    struct netif netif;
+    union {
+        struct {
+            int8_t rssi;
+        } sta;
+    };
+} wifi_interface;
+
 typedef void *wifi_interface_t;
 typedef void (*sniffer_cb_t)(void *env, uint8_t *pkt, int len);
 typedef void (*scan_item_cb_t)(wifi_mgmr_ap_item_t *env, uint32_t *param1, wifi_mgmr_ap_item_t *item);

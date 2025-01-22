@@ -61,3 +61,11 @@ pwmForm.addEventListener('submit', (event) => {
     fetch("/pin_mapping", { method: "POST", body: new FormData(pwmForm)})
         .catch((err) => alert(err));
 });
+
+
+const hostnameForm = document.getElementById("hostname-settings");
+hostnameForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    fetch("/hostname", { method: "POST", body: new FormData(hostnameForm)})
+        .catch((err) => alert(err));
+});
