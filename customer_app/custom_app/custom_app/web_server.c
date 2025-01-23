@@ -13,7 +13,9 @@
 #include "pwm.h"
 #include "persistence.h"
 
+#define REQUEST_HANDLER_PRIO 7
 #define REQUEST_HANDLER_STACK_SIZE 8192
+#define RTOS_DELAY_MS 20
 
 void rebooter() {
     puts("[Rebooter] Waiting a second...");
@@ -579,7 +581,7 @@ void httpd_handler(struct netconn *conn) {
 
 void request_handle_thread(void* arg) {
     struct netconn* conn = (struct netconn*) arg;
-    vTaskDelay(20);
+    vTaskDelay(RTOS_DELAY_MS);
     puts("[http_request_handler] Handling request\n");
     httpd_handler(conn);
     puts("[http_request_handler] Request handled\n");
@@ -604,18 +606,18 @@ void http_server(void *pvParameters) {
     puts("[http_pserver] Listening on port 80......\r\n");
     while (1) {
         if(uxQueueMessagesWaiting(conn->acceptmbox) > 0) {
-            vTaskDelay(20);
+            vTaskDelay(RTOS_DELAY_MS);
             printf("uxMessagesWaiting: %d\n", uxQueueMessagesWaiting(conn->acceptmbox));
             puts("[http_server] New tcp connection in queue\n");
             if (netconn_accept(conn, &newconn) == ERR_OK) {
                 puts("[http_server] New tcp connection established\n");
                 puts("[http_server] Create request handler\n");
-                if(sys_thread_new("request_handler", request_handle_thread, newconn, REQUEST_HANDLER_STACK_SIZE, 7) != NULL) {
+                if(sys_thread_new("request_handler", request_handle_thread, newconn, REQUEST_HANDLER_STACK_SIZE, REQUEST_HANDLER_PRIO) != NULL) {
                     puts("[http_server] Request handler created\n");
                 } else puts("[http_server] Request handler not created\n");
             }
             puts("[http_server] Tcp connection in queue handled\n");
         }
-        vTaskDelay(20);
+        vTaskDelay(RTOS_DELAY_MS);
     }
 }
