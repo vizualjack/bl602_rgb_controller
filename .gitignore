@@ -6,7 +6,6 @@
 .sync_*
 *.bin*
 *.pack
-**/custom_app/build_counter
 **/custom_app/page.c
 info.txt
 todo.txt

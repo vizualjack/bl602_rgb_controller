@@ -13,7 +13,7 @@ extern void set_green_channel(int channel_index);
 extern void set_blue_channel(int channel_index);
 extern void set_white_channel(int channel_index);
 extern void save_channels();
-// extern void init_pwm();
+extern void init_pwm();
 extern void pwm_changer(void *pvParameters);
 
 #endif

@@ -101,6 +101,6 @@ void pwm_changer(void *pvParameters) {
             set_channel_duty(current_channel, current_channel_duty);
             need_to_update_channel_duty = false;
         }
-        vTaskDelay(500);
+        vTaskDelay(10);
     }
 }

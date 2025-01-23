@@ -138,7 +138,5 @@ int bl_sys_early_init(void)
 int bl_sys_init(void)
 {
     bl_sys_em_config();
-    bl_sys_rstinfo_get();
-    bl_sys_rstinfo_init();
     return 0;
 }

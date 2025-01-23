@@ -6,11 +6,14 @@
 #include <lwip/err.h>
 #include <string.h>
 #include <hal_sys.h>
+#include <queue.h>
 
 #include "connection.c"
 #include "page.h"
 #include "pwm.h"
 #include "persistence.h"
+
+#define REQUEST_HANDLER_STACK_SIZE 8192
 
 void rebooter() {
     puts("[Rebooter] Waiting a second...");
@@ -36,7 +39,19 @@ void handle_get_requests(struct netconn *conn, const char* initial_data) {
         snprintf(response_header, sizeof(response_header), response_header_template, content_length);
         netconn_write(conn, response_header, strlen(response_header), NETCONN_NOCOPY);
         netconn_write(conn, js_script, content_length, NETCONN_NOCOPY);
-    } else {
+    } else if(strstr(initial_data, "GET /switch_light") != NULL) {
+        const char *response =
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/html\r\n"
+            "Content-Length: %d\r\n"
+            "Connection: close\r\n\r\n"
+            "Switched light";
+        bool turn_on = strstr(initial_data, "turn=on") != NULL;
+        int pwm_duty = turn_on ? 100 : 0;
+        set_rgbw_duty(pwm_duty, pwm_duty, pwm_duty, pwm_duty);
+        netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
+    } 
+    else {
         const char *response_header_template =
             "HTTP/1.1 200 OK\r\n"
             "Content-Type: text/html\r\n"
@@ -332,7 +347,8 @@ void handle_new_duty(struct netconn *conn, const char* body) {
     b = get_color_value_from_json(body, 'b');
     w = get_color_value_from_json(body, 'w');
     printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
-    update_rgbw_duties(r, g, b, w);
+    // update_rgbw_duties(r, g, b, w);
+    set_rgbw_duty(r,g,b,w);
     const char *response =
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/html\r\n"
@@ -527,6 +543,7 @@ void handle_post_requests(struct netconn* conn, const char* inital_data, int ini
         handle_hostname(conn, body_content);
     }
 }
+
 void httpd_handler(struct netconn *conn) {
     struct netbuf *inbuf;
     err_t error = netconn_recv(conn, &inbuf);
@@ -560,9 +577,24 @@ void httpd_handler(struct netconn *conn) {
     netbuf_delete(inbuf); // Closing last netbuf i got
 }
 
+void request_handle_thread(void* arg) {
+    struct netconn* conn = (struct netconn*) arg;
+    vTaskDelay(20);
+    puts("[http_request_handler] Handling request\n");
+    httpd_handler(conn);
+    puts("[http_request_handler] Request handled\n");
+    puts("[http_request_handler] Close newconn\n");
+    netconn_close(conn);
+    puts("[http_request_handler] Delete newconn\n");
+    netconn_delete(conn);
+    puts("[http_request_handler] Connection closed and deleted\n");
+    vTaskDelete(NULL);
+}
+
 // Start the HTTP server
 void http_server(void *pvParameters) {
     vTaskDelay(2000);
+    init_pwm();
     struct netconn *conn, *newconn;
     puts("[http_server] Starting...\r\n");
     // Create a new TCP connection
@@ -571,17 +603,19 @@ void http_server(void *pvParameters) {
     netconn_listen(conn);
     puts("[http_pserver] Listening on port 80......\r\n");
     while (1) {
-        // Accept new connections
-        if (netconn_accept(conn, &newconn) == ERR_OK) {
-            printf("Free heap size: %d\r\n", xPortGetFreeHeapSize());
-            puts("[http_server] New tcp connection established\n");
-            puts("[http_server] Handle request\n");
-            httpd_handler(newconn);
-            puts("[http_server] Close newconn\n");
-            netconn_close(newconn);
-            puts("[http_server] Delete newconn\n");
-            netconn_delete(newconn);
-            puts("[http_server] Tcp connection closed and deleted\n");
+        if(uxQueueMessagesWaiting(conn->acceptmbox) > 0) {
+            vTaskDelay(20);
+            printf("uxMessagesWaiting: %d\n", uxQueueMessagesWaiting(conn->acceptmbox));
+            puts("[http_server] New tcp connection in queue\n");
+            if (netconn_accept(conn, &newconn) == ERR_OK) {
+                puts("[http_server] New tcp connection established\n");
+                puts("[http_server] Create request handler\n");
+                if(sys_thread_new("request_handler", request_handle_thread, newconn, REQUEST_HANDLER_STACK_SIZE, 7) != NULL) {
+                    puts("[http_server] Request handler created\n");
+                } else puts("[http_server] Request handler not created\n");
+            }
+            puts("[http_server] Tcp connection in queue handled\n");
         }
+        vTaskDelay(20);
     }
 }

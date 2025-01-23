@@ -471,7 +471,6 @@ static void system_init(void)
             (unsigned int)&_heap_size, &_heap_start,
             (unsigned int)&_heap_wifi_size, &_heap_wifi_start
     );
-    bl_sys_init();
     blog_init();
     bl_irq_init();
     bl_sec_init();
@@ -490,7 +489,7 @@ void set_system_clock() {
 
 #define EVENT_LOOP_STACK_SIZE 4096
 #define CONNECTION_TASK_STACK_SIZE 4096
-#define HTTP_SERVER_STACK_SIZE 10240
+#define HTTP_SERVER_STACK_SIZE 1024
 #define UDP_SERVER_STACK_SIZE 4096
 #define PWM_CHANGER_STACK_SIZE 1024
 void bfl_main()
@@ -519,15 +518,15 @@ void bfl_main()
     xTaskCreateStatic(handle_connection, (char*)"connection_task", CONNECTION_TASK_STACK_SIZE, NULL, 15, connection_task_stack, &connection_task);
     puts("[OS] Added connection task\r\n");
 
-    xTaskCreateStatic(http_server, (char*)"http_server", HTTP_SERVER_STACK_SIZE, NULL, TCPIP_THREAD_PRIO-1, http_server_task_stack, &http_server_task);
+    xTaskCreateStatic(http_server, (char*)"http_server", HTTP_SERVER_STACK_SIZE, NULL, 7, http_server_task_stack, &http_server_task);
     // sys_thread_new("http_server", http_server, NULL, HTTP_SERVER_STACK_SIZE, TCPIP_THREAD_PRIO-2);
     puts("[OS] Added http server task\r\n");
     // FOR INDIRECT CHANGE VIA HTTP SERVER
-    xTaskCreateStatic(pwm_changer, (char*)"pwm_changer", PWM_CHANGER_STACK_SIZE, NULL, 0, pwm_changer_task_stack, &pwm_changer_task);
-    puts("[OS] Added pvm changer task\r\n");
-
-    xTaskCreateStatic(udp_server, (char*)"udp_server", UDP_SERVER_STACK_SIZE, NULL, 15, udp_server_task_stack, &udp_server_task);
-    puts("[OS] Added udp server task\r\n");
+    // xTaskCreateStatic(pwm_changer, (char*)"pwm_changer", PWM_CHANGER_STACK_SIZE, NULL, 7, pwm_changer_task_stack, &pwm_changer_task);
+    // puts("[OS] Added pvm changer task\r\n");
+ 
+    // xTaskCreateStatic(udp_server, (char*)"udp_server", UDP_SERVER_STACK_SIZE, NULL, 15, udp_server_task_stack, &udp_server_task);
+    // puts("[OS] Added udp server task\r\n");
 
     puts("[OS] Starting OS Scheduler...\r\n");
     vTaskStartScheduler();
