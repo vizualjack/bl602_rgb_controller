@@ -41,25 +41,20 @@ void check_for_reset() {
 }
 
 void handle_connection(void *pvParameters) {
-    while (1) {
-        if(finished_init) {
-            check_for_reset();
-            char* ssid = get_saved_value(WIFI_SSID_KEY);
-            char* pass = get_saved_value(WIFI_PASS_KEY);
-            if (ssid != NULL && pass != NULL) {
-                puts("Connecting to wifi...\r\n");
-                connect_wifi(ssid, pass);
-            }
-            else {
-                if(ssid != NULL) free(ssid);
-                if(pass != NULL) free(pass);
-                puts("Starting ap...\r\n");
-                wifi_mgmr_ap_start(wifi_mgmr_ap_enable(), "Need to setup", 0, NULL, 1);
-            }
-            break;
-        }
-        vTaskDelay(100);
+    puts("[con_task] Starting...\n");
+    check_for_reset();
+    char* ssid = get_saved_value(WIFI_SSID_KEY);
+    char* pass = get_saved_value(WIFI_PASS_KEY);
+    if (ssid != NULL && pass != NULL) {
+        puts("Connecting to wifi...\r\n");
+        connect_wifi(ssid, pass);
     }
-    puts("Custom task end");
+    else {
+        if(ssid != NULL) free(ssid);
+        if(pass != NULL) free(pass);
+        puts("Starting ap...\r\n");
+        wifi_mgmr_ap_start(wifi_mgmr_ap_enable(), "Need to setup", 0, NULL, 1);
+    }
+    puts("[con_task] Finished\n");
     vTaskDelete(NULL);
 }

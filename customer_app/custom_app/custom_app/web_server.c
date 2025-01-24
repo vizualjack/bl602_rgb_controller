@@ -13,9 +13,10 @@
 #include "page.h"
 #include "pwm.h"
 #include "persistence.h"
+#include "starter.h"
 
-#define REQUEST_HANDLER_PRIO 7
-#define REQUEST_HANDLER_STACK_SIZE 2048
+// #define REQUEST_HANDLER_PRIO 20
+#define REQUEST_HANDLER_STACK_SIZE REAL_STACK(4096) // E 4096; NE 1024: SUCKS??? 2048; SUCKS??? 3072
 #define RTOS_DELAY_MS 20
 #define BUFFER_SIZE 1024
 
@@ -206,9 +207,9 @@ void handle_ota_update(int fd, int content_length, char* buffer, int buffer_leng
         "Connection: close\r\n\r\n"
         "Firmware uploaded successfully.";
     // netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
+    trigger_delayed_reboot();
     send(fd, success_response, strlen(success_response), 0);
     // if(inbuf == NULL) netbuf_delete(inbuf);
-    trigger_delayed_reboot();
 }
 
 void handle_wifi_settings(int fd, const char* body) {
@@ -715,7 +716,7 @@ void http_server(void *pvParameters) {
                 client_fd = accept(tcp_listen_fd, (struct sockaddr*)&client_addr, &sockaddr_t_size);
                 if (client_fd >= 0) {
                     vTaskDelay(RTOS_DELAY_MS);
-                    if(sys_thread_new("request_handler", request_handle_thread, (void*)client_fd, REQUEST_HANDLER_STACK_SIZE / sizeof(StackType_t), REQUEST_HANDLER_PRIO) == NULL) {
+                    if(sys_thread_new("request_handler", request_handle_thread, (void*)client_fd, REQUEST_HANDLER_STACK_SIZE, MY_TASK_PRIO) == NULL) {
                         puts("[http_server] Can't create new request_handler\n");
                         lwip_close(client_fd);
                         client_fd = -1;

@@ -90,10 +90,8 @@
 #include "bl_pwm.h"
 #include "hal_pwm.h"
 #include "main.h"
-#include "connection.h"
-#include "web_server.h"
 #include "pwm.h"
-#include "udp_server.h"
+#include "starter.h"
 
 #define mainHELLO_TASK_PRIORITY     ( 20 )
 #define UART_ID_2 (2)
@@ -132,16 +130,13 @@ static HeapRegion_t xHeapRegions[] =
         { NULL, 0 }, /* Terminates the array. */
         { NULL, 0 } /* Terminates the array. */
 };
-// static wifi_interface_t wifi_interface;
-bool finished_init = false;
-
 
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName )
 {
     puts("Stack Overflow checked\r\n");
     printf("Task Name %s\r\n", pcTaskName);
     // TODO: why it actually happens
-    hal_reboot(); 
+    // hal_reboot(); 
     // //////////////
     while (1) {
         /*empty here*/
@@ -393,7 +388,6 @@ static void event_loop(void *pvParameters)
 
     aos_register_event_filter(EV_WIFI, event_cb_wifi_event, NULL);
     start_wifi_stack(NULL, 0, 0, NULL);
-    finished_init = true;
 
     for(int i = 0; i < 4; i++) {
         int id = channel_pin_map[i][0];
@@ -403,6 +397,7 @@ static void event_loop(void *pvParameters)
         bl_pwm_set_duty(id, 0);
     }
 
+    aos_post_delayed_action(1000, my_starter, NULL);
     aos_loop_run();
     puts("------------------------------------------\r\n");
     puts("+++++++++Critical Exit From Loop++++++++++\r\n");
@@ -412,13 +407,14 @@ static void event_loop(void *pvParameters)
     vTaskDelete(NULL);
 }
 
+#define IDLE_TASK_STACK_SIZE REAL_STACK(1024) // prev size was configMINIMAL_STACK_SIZE
 void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize)
 {
     /* If the buffers to be provided to the Idle task are declared inside this
     function then they must be declared static - otherwise they will be allocated on
     the stack and so not exists after this function exits. */
     static StaticTask_t xIdleTaskTCB;
-    static StackType_t uxIdleTaskStack[ configMINIMAL_STACK_SIZE ];
+    static StackType_t uxIdleTaskStack[ IDLE_TASK_STACK_SIZE ];
 
     /* Pass out a pointer to the StaticTask_t structure in which the Idle task's
     state will be stored. */
@@ -430,7 +426,7 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackTyp
     /* Pass out the size of the array pointed to by *ppxIdleTaskStackBuffer.
     Note that, as the array is necessarily of type StackType_t,
     configMINIMAL_STACK_SIZE is specified in words, not bytes. */
-    *pulIdleTaskStackSize = configMINIMAL_STACK_SIZE;
+    *pulIdleTaskStackSize = IDLE_TASK_STACK_SIZE;
 }
 
 /* configSUPPORT_STATIC_ALLOCATION and configUSE_TIMERS are both set to 1, so the
@@ -485,29 +481,12 @@ static void system_init(void)
     tcpip_init(NULL, NULL);
 }
 
-void set_system_clock() {
-    // printf("Clock type: %d", GLB_Get_Root_CLK_Sel());
-    printf("Set clock speed: %d", GLB_Set_System_CLK(GLB_PLL_XTAL_40M, GLB_PLL_CLK_192M));
-}
 
-#define EVENT_LOOP_STACK_SIZE 4096
-#define CONNECTION_TASK_STACK_SIZE 4096
-#define HTTP_SERVER_STACK_SIZE 2048
-#define HTTP_SERVER_PRIO 7
-#define UDP_SERVER_STACK_SIZE 4096
-#define PWM_CHANGER_STACK_SIZE 1024
+#define EVENT_LOOP_STACK_SIZE REAL_STACK(4096)
 void bfl_main()
 {
     static StackType_t event_loop_stack[EVENT_LOOP_STACK_SIZE];
     static StaticTask_t event_loop_task;
-    static StackType_t connection_task_stack[CONNECTION_TASK_STACK_SIZE];
-    static StaticTask_t connection_task;
-    static StackType_t http_server_task_stack[HTTP_SERVER_STACK_SIZE];
-    static StaticTask_t http_server_task;
-    static StackType_t udp_server_task_stack[UDP_SERVER_STACK_SIZE];
-    static StaticTask_t udp_server_task;
-    static StackType_t pwm_changer_task_stack[PWM_CHANGER_STACK_SIZE];
-    static StaticTask_t pwm_changer_task;
     
     time_main = bl_timer_now_us();
     
@@ -515,23 +494,8 @@ void bfl_main()
     printf("Boot2 consumed %lums\r\n", time_main / 1000);
     puts("Starting firmware now....\r\n");
     system_init();
-    // set_system_clock();
-    // Tasks
     xTaskCreateStatic(event_loop, (char*)"event_loop", EVENT_LOOP_STACK_SIZE, NULL, 15, event_loop_stack, &event_loop_task);
     puts("[OS] Added event_loop task\r\n");
-    xTaskCreateStatic(handle_connection, (char*)"connection_task", CONNECTION_TASK_STACK_SIZE, NULL, 15, connection_task_stack, &connection_task);
-    puts("[OS] Added connection task\r\n");
-    printf("StackType_t size: %d\n", sizeof(StackType_t));
-    xTaskCreateStatic(http_server, (char*)"http_server", HTTP_SERVER_STACK_SIZE / sizeof(StackType_t), NULL, HTTP_SERVER_PRIO, http_server_task_stack, &http_server_task);
-    // sys_thread_new("http_server", http_server, NULL, HTTP_SERVER_STACK_SIZE, TCPIP_THREAD_PRIO-2);
-    puts("[OS] Added http server task\r\n");
-    // FOR INDIRECT CHANGE VIA HTTP SERVER
-    // xTaskCreateStatic(pwm_changer, (char*)"pwm_changer", PWM_CHANGER_STACK_SIZE, NULL, 7, pwm_changer_task_stack, &pwm_changer_task);
-    // puts("[OS] Added pvm changer task\r\n");
- 
-    // xTaskCreateStatic(udp_server, (char*)"udp_server", UDP_SERVER_STACK_SIZE, NULL, 15, udp_server_task_stack, &udp_server_task);
-    // puts("[OS] Added udp server task\r\n");
-
     puts("[OS] Starting OS Scheduler...\r\n");
     vTaskStartScheduler();
 }
