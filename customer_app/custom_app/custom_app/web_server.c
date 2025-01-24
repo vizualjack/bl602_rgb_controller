@@ -15,10 +15,9 @@
 #include "persistence.h"
 
 #define REQUEST_HANDLER_PRIO 7
-#define REQUEST_HANDLER_STACK_SIZE 8192
+#define REQUEST_HANDLER_STACK_SIZE 3072
 #define RTOS_DELAY_MS 20
 #define BUFFER_SIZE 1024
-#define MAX_BODY_SIZE 1024
 
 void rebooter() {
     puts("[Rebooter] Waiting a second...");
@@ -33,8 +32,8 @@ void trigger_delayed_reboot() {
 }
 
 // void handle_get_requests(struct netconn *conn, const char* initial_data) {
-void handle_get_requests(int fd, const char* initial_data) {
-    if(strstr(initial_data, "GET /script.js") != NULL) {
+void handle_get_requests(int fd, const char* buffer) {
+    if(strstr(buffer, "GET /script.js") != NULL) {
         const char *response_header_template =
             "HTTP/1.1 200 OK\r\n"
             "Content-Type: text/javascript\r\n"
@@ -47,15 +46,14 @@ void handle_get_requests(int fd, const char* initial_data) {
         send(fd,response_header, strlen(response_header), 0);
         // netconn_write(conn, js_script, content_length, NETCONN_NOCOPY);
         send(fd, js_script, content_length, 0);
-    } else if(strstr(initial_data, "GET /switch_light") != NULL) {
+    } else if(strstr(buffer, "GET /switch_light") != NULL) {
         const char *response =
             "HTTP/1.1 200 OK\r\n"
             "Content-Type: text/html\r\n"
-            "Content-Length: %d\r\n"
             "Connection: close\r\n\r\n"
             "Switched light";
-        bool turn_on = strstr(initial_data, "turn=on") != NULL;
-        int pwm_duty = turn_on ? 100 : 0;
+        bool turn_on = strstr(buffer, "turn=on") != NULL;
+        int pwm_duty = turn_on ? 10 : 0;
         set_rgbw_duty(pwm_duty, pwm_duty, pwm_duty, pwm_duty);
         // netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
         send(fd, response, strlen(response), 0);
@@ -74,18 +72,16 @@ void handle_get_requests(int fd, const char* initial_data) {
         // netconn_write(conn, html_page, content_length, NETCONN_NOCOPY);
         send(fd, html_page, content_length, 0);
     }
-    
 }
 
-void handle_ota_update(int fd, int content_length, const char* initial_body, int initial_body_length) {
-    printf("[OTA] initial_body_length: %d\r\n", initial_body_length);
-    printf("[OTA] initial_body: %s\r\n", initial_body);
+void handle_ota_update(int fd, int content_length, char* buffer, int buffer_length) {
+    printf("[OTA] buffer_length: %d\r\n", buffer_length);
+    printf("[OTA] buffer: %s\r\n", buffer);
     printf("[OTA] content_length: %d\r\n", content_length);
 	bl_mtd_handle_t handle;
 	int ret;
 	ret = bl_mtd_open(BL_MTD_PARTITION_NAME_FW_DEFAULT, &handle, BL_MTD_OPEN_FLAG_BACKUP);
-	if(ret)
-	{
+	if(ret) {
         puts("Open Default FW partition failed\r\n");
         const char *error_response =
             "HTTP/1.1 500 Internal Server Error\r\n"
@@ -135,7 +131,7 @@ void handle_ota_update(int fd, int content_length, const char* initial_body, int
 	}
 	printf("[OTA] Flash erased\r\n");
 	printf("[OTA] Flashing new firmware\r\n");
-    char* buf;
+    // char* buf;
     u16_t buflen;
     int remaining = content_length;
 	int total = 0;
@@ -146,21 +142,22 @@ void handle_ota_update(int fd, int content_length, const char* initial_body, int
     int raw_total = 0;
     int highest_buffer = 0;
     int last_buffer_size = 0;
-    char buffer[MAX_BODY_SIZE];
+    // char buffer[BUFFER_SIZE];
     while (remaining > 0) {
         if(!initial_buffer_handled) {
             puts("[OTA] Using inital_body\n");
-            buf = (char*) initial_body;
-            buflen = initial_body_length;
+            // buf = (char*) initial_body;
+            buflen = buffer_length;
             initial_buffer_handled = true;
             if(buflen <= 0) continue;
         } else {
             // puts("[OTA] Deleting current inbuf\n");
             // netbuf_delete(*inbuf);
+            puts("[OTA] Cleaning buffer\n");
+            memset(buffer, 0, BUFFER_SIZE);
+            // buf = (char*) initial_body;
             puts("[OTA] Receiving next data\n");
-            memset(buffer, 0, MAX_BODY_SIZE);
-            buf = (char*) &buffer;
-            buflen = recv(fd, &buffer, MAX_BODY_SIZE, 0);
+            buflen = recv(fd, buffer, BUFFER_SIZE, 0);
             if(buflen <= 0) {
 	            bl_mtd_close(handle);
                 puts("[OTA] Can't receive next inbuf\n");
@@ -191,7 +188,7 @@ void handle_ota_update(int fd, int content_length, const char* initial_body, int
         raw_total += buflen;
         remaining -= buflen;
         printf("Remaining: %d\r\n", remaining);
-        bl_mtd_write(handle, flash_offset, buflen, (u_int8_t*)buf);
+        bl_mtd_write(handle, flash_offset, buflen, (u_int8_t*)buffer);
         flash_offset += buflen;
         total += buflen;
         // } while(netbuf_next(*inbuf) != -1);
@@ -288,11 +285,11 @@ void handle_wifi_settings(int fd, const char* body) {
     trigger_delayed_reboot();
 }
 
-void handle_pin_set_state(int fd, const char* initial_data, const char* body) {
+void handle_pin_set_state(int fd, const char* path, const char* body) {
     char* start = strstr(body, "name=\"pin\"\r\n\r\n");
     start += 14;
     int channel_index = atoi(start);
-    bool setHigh = strstr(initial_data, "POST /set_pin_high") != NULL;
+    bool setHigh = strstr(path, "/set_pin_high") != NULL;
     // update_channel_duty(channel_index, setHigh ? 100 : 0);
     set_channel_duty(channel_index, setHigh ? 100 : 0);
     const char *response =
@@ -425,20 +422,20 @@ void handle_clean_easyflash(int fd, const char* body) {
     send(fd, response, strlen(response), 0);
 }
 
-bool handle_special_cases(int fd, const char* inital_data, const char* inital_body, int inital_body_length, int content_length) {
+bool handle_special_cases(int fd, const char* path, char* buffer, int buffer_length, int content_length) {
     bool handled = false;
-    if(strstr(inital_data, "POST /ota") != NULL) {
-        handle_ota_update(fd, content_length, inital_body, inital_body_length);
+    if(strstr(path, "/ota") != NULL) {
+        handle_ota_update(fd, content_length, buffer, buffer_length);
         handled = true;
     }
     return handled;
 }
 
 // void handle_post_requests(struct netconn* conn, const char* inital_data, int initial_data_length, struct netbuf** inbuf) {
-void handle_post_requests(int fd, const char* inital_data, int initial_data_length) {
+void handle_post_requests(int fd, char* buffer, int current_buffer_length) {
     puts("[httpd_handler] Handling POST request...\n");
     // Get content length
-    char *content_length_str = strstr(inital_data, "Content-Length:");
+    char *content_length_str = strstr(buffer, "Content-Length:");
     if (!content_length_str) {
         puts("Content-Length header not found\n");
         const char *response =
@@ -454,15 +451,24 @@ void handle_post_requests(int fd, const char* inital_data, int initial_data_leng
     sscanf(content_length_str, "Content-Length: %d", &content_length);
     // Got content length
     printf("Content-Length header found: %d\n", content_length);
+    // Getting path
+    char* path_pos = strstr(buffer, "/");
+    char* path_end = strstr(buffer, "\r\n");
+    int path_length = path_end - path_pos;
+    char path[path_length + 1];
+    strncpy(path, path_pos, path_length);
+    path[path_length] = '\0';
+    // 
     // Get initial body
-    char body_content[MAX_BODY_SIZE];
-    memset(body_content, 0, MAX_BODY_SIZE);
-    char* body = strstr(inital_data, "\r\n\r\n");
+    // char body_content[BUFFER_SIZE];
+    // memset(body_content, 0, BUFFER_SIZE);
+    char* body = strstr(buffer, "\r\n\r\n");
     int body_length;
     if(body == NULL) {
+        memset(buffer, 0, BUFFER_SIZE);
         puts("[httpd_handler] Need to get inital body\n");
-        int datalen = recv(fd, &body_content, MAX_BODY_SIZE, 0);
-        printf("[httpd_handler] After receive: %s\n", body_content);
+        int datalen = recv(fd, buffer, BUFFER_SIZE, 0);
+        printf("[httpd_handler] After receive: %s\n", buffer);
         if(datalen <= 0) {
             const char *response =
                 "HTTP/1.1 500 Internal error\r\n"
@@ -473,7 +479,7 @@ void handle_post_requests(int fd, const char* inital_data, int initial_data_leng
             send(fd, response, strlen(response), 0);
             return;
         }
-        body = strstr(body_content, "\r\n\r\n");
+        body = strstr(buffer, "\r\n\r\n");
         if(body == NULL) {
             const char *response =
                 "HTTP/1.1 500 Internal error\r\n"
@@ -484,18 +490,26 @@ void handle_post_requests(int fd, const char* inital_data, int initial_data_leng
             send(fd, response, strlen(response), 0);
             return;
         }
-        body_length = datalen - (body - body_content);
-        memcpy(body_content, body, body_length);
-        printf("[httpd_handler] After memcpy: %s\n", body_content);
-        int need_to_clean_size = MAX_BODY_SIZE - body_length;
+        body_length = datalen - (body - buffer);
+        memcpy(buffer, body, body_length);
+        // printf("[httpd_handler] After memcpy: %s\n", body_content);
+        int need_to_clean_size = BUFFER_SIZE - body_length;
         if(need_to_clean_size > 0) {
-            memset(body_content+body_length, 0, need_to_clean_size);
-            printf("[httpd_handler] After memset: %s\n", body_content);
+            memset(buffer+body_length, 0, need_to_clean_size);
+            // printf("[httpd_handler] After memset: %s\n", body_content);
         }
-        body = (char*) &body_content;
+        body = buffer;
     } else {
         puts("[httpd_handler] No need for getting inital body\n");
-        body_length = initial_data_length - (body - inital_data);
+        body_length = current_buffer_length - (body - buffer);
+        memcpy(buffer, body, body_length);
+        // printf("[httpd_handler] After memcpy: %s\n", buffer);
+        int need_to_clean_size = BUFFER_SIZE - body_length;
+        if(need_to_clean_size > 0) {
+            memset(buffer+body_length, 0, need_to_clean_size);
+            // printf("[httpd_handler] After memset: %s\n", buffer);
+        }
+        body = buffer;
         // body_length = strlen(inital_data) - (body - inital_data);
         // body_length = strlen(body);
     }
@@ -511,9 +525,9 @@ void handle_post_requests(int fd, const char* inital_data, int initial_data_leng
     }
     body += 4;
     body_length -= 4;
-    if(handle_special_cases(fd, inital_data, body, body_length, content_length)) return;
+    if(handle_special_cases(fd, path, body, body_length, content_length)) return;
     // Getting total body
-    if(content_length > MAX_BODY_SIZE) {
+    if(content_length > BUFFER_SIZE) {
         const char *response =
             "HTTP/1.1 500 Internal error\r\n"
             "Content-Type: text/plain\r\n"
@@ -528,7 +542,7 @@ void handle_post_requests(int fd, const char* inital_data, int initial_data_leng
     printf("current_body_size: %d\n", current_body_size);
     while(current_body_size < content_length) {
         puts("Getting next part...\n");
-        int new_data_length = recv(fd, body_content+current_body_size, MAX_BODY_SIZE-current_body_size, 0);
+        int new_data_length = recv(fd, buffer+current_body_size, BUFFER_SIZE-current_body_size, 0);
         current_body_size += new_data_length;
         if(new_data_length <= 0) break;
         // char* data;
@@ -558,7 +572,7 @@ void handle_post_requests(int fd, const char* inital_data, int initial_data_leng
         return;
     }
     // puts("Zeroing body_content\n");
-    // memset(body_content, 0, MAX_BODY_SIZE);
+    // memset(body_content, 0, BUFFER_SIZE);
     // puts("Copy inital body to body_content\n");
     // memcpy(body_content, body, current_body_size);
     // while(current_body_size < content_length) {
@@ -595,25 +609,25 @@ void handle_post_requests(int fd, const char* inital_data, int initial_data_leng
     // }
     puts("Got total body\n");
     printf("Body: %s\n", body);
-    if (strstr(inital_data, "POST /wifi") != NULL) {
+    if (strstr(path, "/wifi") != NULL) {
         handle_wifi_settings(fd, body);
     }
-    else if (strstr(inital_data, "POST /set_pin_high") != NULL || strstr(inital_data, "POST /set_pin_low") != NULL) {
-        handle_pin_set_state(fd, inital_data, body);
+    else if (strstr(path, "/set_pin_high") != NULL || strstr(buffer, "/set_pin_low") != NULL) {
+        handle_pin_set_state(fd, path, body);
     }
-    else if (strstr(inital_data, "POST /pin_mapping") != NULL) {
+    else if (strstr(path, "/pin_mapping") != NULL) {
         handle_pin_mapping(fd, body);
     }
-    else if (strstr(inital_data, "POST /new_duty") != NULL) {
+    else if (strstr(path, "/new_duty") != NULL) {
         handle_new_duty(fd, body);
     }
-    else if (strstr(inital_data, "POST /reboot") != NULL) {
+    else if (strstr(path, "/reboot") != NULL) {
         handle_rebooting(fd, body);
     } 
-    else if (strstr(inital_data, "POST /clean_easyflash") != NULL) {
+    else if (strstr(path, "/clean_easyflash") != NULL) {
         handle_clean_easyflash(fd, body);
     }
-    else if (strstr(inital_data, "POST /hostname") != NULL) {
+    else if (strstr(path, "/hostname") != NULL) {
         handle_hostname(fd, body);
     }
 }
@@ -631,10 +645,13 @@ void httpd_handler(int fd) {
     //     netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
     //     return;
     // }
-    char inital_data[BUFFER_SIZE];
-    memset(inital_data, 0, BUFFER_SIZE);
+    // char buffer[BUFFER_SIZE];
+    char* buffer = pvPortMalloc(BUFFER_SIZE);
+    puts("[httpd_handler] Cleaning buffer\n");
+    memset(buffer, 0, BUFFER_SIZE);
+    puts("[httpd_handler] Receiving data\n");
     // error = netbuf_data(inbuf, (void**)&inital_data, &inital_data_length);
-    int received = recv(fd, &inital_data, BUFFER_SIZE, 0);
+    int received = recv(fd, buffer, BUFFER_SIZE, 0);
     // lwip_recv(int s, void *mem, size_t len, int flags)
     if(received <= 0) {
         const char *response =
@@ -646,12 +663,14 @@ void httpd_handler(int fd) {
         send(fd, response, strlen(response), 0);
         return;
     }
-    if(strstr(inital_data, "GET") != NULL) {
-        handle_get_requests(fd, inital_data);
+    if(strstr(buffer, "GET") != NULL) {
+        handle_get_requests(fd, buffer);
     }
     else { // only post is left
-        handle_post_requests(fd, inital_data, received);
+        handle_post_requests(fd, buffer, received);
     }
+    vPortFree(buffer);
+    // free(buffer);
     // netbuf_delete(inbuf); // Closing last netbuf i got
 }
 
@@ -696,7 +715,7 @@ void http_server(void *pvParameters) {
                 client_fd = accept(tcp_listen_fd, (struct sockaddr*)&client_addr, &sockaddr_t_size);
                 if (client_fd >= 0) {
                     vTaskDelay(RTOS_DELAY_MS);
-                    if(sys_thread_new("request_handler", request_handle_thread, (void*)client_fd, REQUEST_HANDLER_STACK_SIZE, REQUEST_HANDLER_PRIO) == NULL) {
+                    if(sys_thread_new("request_handler", request_handle_thread, (void*)client_fd, REQUEST_HANDLER_STACK_SIZE / sizeof(StackType_t), REQUEST_HANDLER_PRIO) == NULL) {
                         puts("[http_server] Can't create new request_handler\n");
                         lwip_close(client_fd);
                         client_fd = -1;

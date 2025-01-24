@@ -518,8 +518,8 @@ void bfl_main()
     puts("[OS] Added event_loop task\r\n");
     xTaskCreateStatic(handle_connection, (char*)"connection_task", CONNECTION_TASK_STACK_SIZE, NULL, 15, connection_task_stack, &connection_task);
     puts("[OS] Added connection task\r\n");
-
-    xTaskCreateStatic(http_server, (char*)"http_server", HTTP_SERVER_STACK_SIZE, NULL, HTTP_SERVER_PRIO, http_server_task_stack, &http_server_task);
+    printf("StackType_t size: %d\n", sizeof(StackType_t));
+    xTaskCreateStatic(http_server, (char*)"http_server", HTTP_SERVER_STACK_SIZE / sizeof(StackType_t), NULL, HTTP_SERVER_PRIO, http_server_task_stack, &http_server_task);
     // sys_thread_new("http_server", http_server, NULL, HTTP_SERVER_STACK_SIZE, TCPIP_THREAD_PRIO-2);
     puts("[OS] Added http server task\r\n");
     // FOR INDIRECT CHANGE VIA HTTP SERVER
