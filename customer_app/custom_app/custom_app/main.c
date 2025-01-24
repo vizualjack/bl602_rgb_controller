@@ -140,6 +140,9 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName )
 {
     puts("Stack Overflow checked\r\n");
     printf("Task Name %s\r\n", pcTaskName);
+    // TODO: why it actually happens
+    hal_reboot(); 
+    // //////////////
     while (1) {
         /*empty here*/
     }
@@ -489,7 +492,7 @@ void set_system_clock() {
 
 #define EVENT_LOOP_STACK_SIZE 4096
 #define CONNECTION_TASK_STACK_SIZE 4096
-#define HTTP_SERVER_STACK_SIZE 1024
+#define HTTP_SERVER_STACK_SIZE 2048
 #define HTTP_SERVER_PRIO 7
 #define UDP_SERVER_STACK_SIZE 4096
 #define PWM_CHANGER_STACK_SIZE 1024

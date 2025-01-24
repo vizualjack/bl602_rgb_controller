@@ -78,6 +78,7 @@
         "scoped_allocator": "cpp",
         "wifi_mgmr_ext.h": "c",
         "wifi_mgmr.h": "c",
-        "page.h": "c"
+        "page.h": "c",
+        "pwm.h": "c"
     }
 }

@@ -15,7 +15,7 @@
 #include "persistence.h"
 
 #define REQUEST_HANDLER_PRIO 7
-#define REQUEST_HANDLER_STACK_SIZE 3072
+#define REQUEST_HANDLER_STACK_SIZE 2048
 #define RTOS_DELAY_MS 20
 #define BUFFER_SIZE 1024
 
