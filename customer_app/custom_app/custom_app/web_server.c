@@ -201,13 +201,14 @@ void handle_ota_update(int fd, int content_length, char* buffer, int buffer_leng
 	hal_boot2_update_ptable(&ptEntry);
 	puts("[OTA] Flashed\r\n");
 	bl_mtd_close(handle);
+	puts("[OTA] Starting rebooter...\r\n");
+    // netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
+    trigger_delayed_reboot();
     puts("[OTA] Sending response...\r\n");
     const char *success_response =
         "HTTP/1.1 200 OK\r\n"
         "Connection: close\r\n\r\n"
         "Firmware uploaded successfully.";
-    // netconn_write(conn, success_response, strlen(success_response), NETCONN_COPY);
-    trigger_delayed_reboot();
     send(fd, success_response, strlen(success_response), 0);
     // if(inbuf == NULL) netbuf_delete(inbuf);
 }
