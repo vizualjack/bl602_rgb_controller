@@ -5,10 +5,11 @@
 
 #include "connection.h"
 #include "web_server.h"
+#include "udp_server.h"
 #include "starter.h"
 
-#define CONNECTION_TASK_STACK_SIZE REAL_STACK(2048)
-#define UDP_SERVER_STACK_SIZE REAL_STACK(1024)
+#define CONNECTION_TASK_STACK_SIZE REAL_STACK(3072)
+#define UDP_SERVER_STACK_SIZE REAL_STACK(2048)
 #define HTTP_SERVER_STACK_SIZE REAL_STACK(2048)
 // #define HTTP_SERVER_PRIO 7
 
@@ -28,5 +29,6 @@ void my_starter() {
     sys_thread_new("http_server", http_server, NULL, HTTP_SERVER_STACK_SIZE, MY_TASK_PRIO);
     puts("[Starter] Added http server task\r\n");
     // xTaskCreateStatic(udp_server, (char*)"udp_server", UDP_SERVER_STACK_SIZE, NULL, 15, udp_server_task_stack, &udp_server_task);
-    // puts("[Starter] Added udp server task\r\n");
+    sys_thread_new("udp_server", udp_server, NULL, UDP_SERVER_STACK_SIZE, MY_TASK_PRIO);
+    puts("[Starter] Added udp server task\r\n");
 }

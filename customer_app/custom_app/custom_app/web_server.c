@@ -54,7 +54,7 @@ void handle_get_requests(int fd, const char* buffer) {
             "Connection: close\r\n\r\n"
             "Switched light";
         bool turn_on = strstr(buffer, "turn=on") != NULL;
-        int pwm_duty = turn_on ? 10 : 0;
+        float pwm_duty = turn_on ? 10.f : 0.f;
         set_rgbw_duty(pwm_duty, pwm_duty, pwm_duty, pwm_duty);
         // netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
         send(fd, response, strlen(response), 0);
@@ -292,8 +292,10 @@ void handle_pin_set_state(int fd, const char* path, const char* body) {
     start += 14;
     int channel_index = atoi(start);
     bool setHigh = strstr(path, "/set_pin_high") != NULL;
+    printf("path: %s\n", path);
+    printf("setHigh: %i\n", setHigh);
     // update_channel_duty(channel_index, setHigh ? 100 : 0);
-    set_channel_duty(channel_index, setHigh ? 100 : 0);
+    set_channel_duty(channel_index, setHigh ? 100.f : 0.f);
     const char *response =
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/html\r\n"
@@ -387,8 +389,16 @@ void handle_new_duty(int fd, const char* body) {
     b = get_color_value_from_json(body, 'b');
     w = get_color_value_from_json(body, 'w');
     printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
+
+    float red, green, blue, white;
+    red =  r / 255.f * 100;
+    green = g / 255.f * 100;
+    blue = b / 255.f * 100;
+    white = w / 255.f * 100;
+    printf("r = %f, g = %f, b = %f, w = %f\n", red, green, blue, white);
+
     // update_rgbw_duties(r, g, b, w);
-    set_rgbw_duty(r,g,b,w);
+    set_rgbw_duty(red, green, blue, white);
     const char *response =
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/html\r\n"
@@ -614,7 +624,7 @@ void handle_post_requests(int fd, char* buffer, int current_buffer_length) {
     if (strstr(path, "/wifi") != NULL) {
         handle_wifi_settings(fd, body);
     }
-    else if (strstr(path, "/set_pin_high") != NULL || strstr(buffer, "/set_pin_low") != NULL) {
+    else if (strstr(path, "/set_pin_high") != NULL || strstr(path, "/set_pin_low") != NULL) {
         handle_pin_set_state(fd, path, body);
     }
     else if (strstr(path, "/pin_mapping") != NULL) {

@@ -93,29 +93,6 @@
             text-align: center;
         }
     </style>
-    <script>
-        function setPinHigh(event, pin) {
-            event.preventDefault();
-            const formData = new FormData();
-            formData.append("pin", pin);
-            fetch("/set_pin_high", {method: "POST", body: formData});
-        }
-
-        function setPinLow(event, pin) {
-            event.preventDefault();
-            const formData = new FormData();
-            formData.append("pin", pin);
-            fetch("/set_pin_low", {method: "POST", body: formData});
-        }
-        
-        function reboot() {
-            fetch("/reboot", {method: "POST"});
-        }
-
-        function cleanEasyflash() {
-            fetch("/clean_easyflash", {method: "POST"});
-        }
-    </script>
 </head>
 <body>
     <h1>BL602 RGB Controller</h1>
@@ -124,11 +101,11 @@
         <form id="uploadForm" action="/ota" method="POST" enctype="multipart/form-data">
             <div id="firmwareFileViewer">
                 <input type="file" id="firmwareFile" name="file" accept=".bin.xz" required>
-                <span id="firmwareFileName">Please drop a file</span>
+                <span id="firmwareFileName">Please drop a file here</span>
             </div>
             <button type="submit" id="firmwareAction">Upload</button>
         </form>
-        <p id="statusMessage" style="text-align: center; margin-top: 1em;"></p>
+        <p id="statusMessageUpload" style="text-align: center; margin-top: 1em;"></p>
     </div>
 
     <div class="container">
@@ -145,6 +122,7 @@
             </div>
             <button type="submit">Set wifi settings</button>
         </form>
+        <p id="statusMessageWifi" style="text-align: center; margin-top: 1em;"></p>
     </div>
 
     
@@ -158,6 +136,7 @@
             </div>
             <button type="submit">Set hostname</button>
         </form>
+        <p id="statusMessageHostname" style="text-align: center; margin-top: 1em;"></p>
     </div>
 
     <div class="container">
@@ -214,12 +193,14 @@
             </div>
             <button type="submit">Configure</button>
         </form>
+        <p id="statusMessagePin" style="text-align: center; margin-top: 1em;"></p>
     </div>
 
     <div class="container">
         <h2>Other actions</h2>
         <button onclick="reboot()">Reboot</button>
         <button onclick="cleanEasyflash()">Clean easyflash</button>
+        <p id="statusMessageAction" style="text-align: center; margin-top: 1em;"></p>
     </div>
     <p id="build">Build %BUILD_COUNT%</p>
     <script src="script.js"></script>

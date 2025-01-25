@@ -41,7 +41,14 @@ void udp_server(void *pvParameters) {
 
                 // Print the received integers
                 printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
-                set_rgbw_duty(r, g, b, w);
+
+                float red, green, blue, white;
+                red =  r / 255.f * 100;
+                green = g / 255.f * 100;
+                blue = b / 255.f * 100;
+                white = w / 255.f * 100;
+                printf("r = %f, g = %f, b = %f, w = %f\n", red, green, blue, white);
+                set_rgbw_duty(red, green, blue, white);
                 netbuf_delete(netbuf);
                 // puts("[udp_server] Udp packet handled successfully\n");
             }

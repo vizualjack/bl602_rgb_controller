@@ -136,7 +136,7 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName )
     puts("Stack Overflow checked\r\n");
     printf("Task Name %s\r\n", pcTaskName);
     // TODO: why it actually happens
-    // hal_reboot(); 
+    hal_reboot(); 
     // //////////////
     while (1) {
         /*empty here*/
