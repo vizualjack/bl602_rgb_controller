@@ -40,8 +40,8 @@ void check_for_reset() {
     clean_saved_value(BOOT_COUNTER);
 }
 
-void handle_connection(void *pvParameters) {
-    puts("[con_task] Starting...\n");
+void handle_connection() {
+    // puts("[con_task] Starting...\n");
     check_for_reset();
     char* ssid = get_saved_value(WIFI_SSID_KEY);
     char* pass = get_saved_value(WIFI_PASS_KEY);
@@ -55,6 +55,6 @@ void handle_connection(void *pvParameters) {
         puts("Starting ap...\r\n");
         wifi_mgmr_ap_start(wifi_mgmr_ap_enable(), "Need to setup", 0, NULL, 1);
     }
-    puts("[con_task] Finished\n");
-    vTaskDelete(NULL);
+    // puts("[con_task] Finished\n");
+    // vTaskDelete(NULL);
 }

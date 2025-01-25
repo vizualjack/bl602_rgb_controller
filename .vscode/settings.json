@@ -81,6 +81,9 @@
         "page.h": "c",
         "pwm.h": "c",
         "persistence.h": "c",
-        "hal_boot2.h": "c"
+        "hal_boot2.h": "c",
+        "web_server.h": "c",
+        "connection.h": "c",
+        "udp_server.h": "c"
     }
 }

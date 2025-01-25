@@ -3,6 +3,6 @@
 
 extern const char* WIFI_SSID_KEY;
 extern const char* WIFI_PASS_KEY;
-void handle_connection(void *pvParameters);
+void handle_connection();
 
 #endif

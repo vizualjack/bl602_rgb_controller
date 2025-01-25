@@ -92,6 +92,7 @@
 #include "main.h"
 #include "pwm.h"
 #include "starter.h"
+#include "connection.h"
 
 #define mainHELLO_TASK_PRIORITY     ( 20 )
 #define UART_ID_2 (2)
@@ -397,7 +398,9 @@ static void event_loop(void *pvParameters)
         bl_pwm_set_duty(id, 0);
     }
 
-    aos_post_delayed_action(1000, my_starter, NULL);
+    // handle_connection();
+    aos_post_delayed_action(100, handle_connection, NULL);
+    aos_post_delayed_action(5000, my_starter, NULL);
     aos_loop_run();
     puts("------------------------------------------\r\n");
     puts("+++++++++Critical Exit From Loop++++++++++\r\n");
@@ -482,7 +485,7 @@ static void system_init(void)
 }
 
 
-#define EVENT_LOOP_STACK_SIZE REAL_STACK(4096)
+#define EVENT_LOOP_STACK_SIZE REAL_STACK(10240)
 void bfl_main()
 {
     static StackType_t event_loop_stack[EVENT_LOOP_STACK_SIZE];
