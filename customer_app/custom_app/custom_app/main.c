@@ -485,7 +485,7 @@ static void system_init(void)
 }
 
 
-#define EVENT_LOOP_STACK_SIZE REAL_STACK(10240)
+#define EVENT_LOOP_STACK_SIZE REAL_STACK(16384)
 void bfl_main()
 {
     static StackType_t event_loop_stack[EVENT_LOOP_STACK_SIZE];
