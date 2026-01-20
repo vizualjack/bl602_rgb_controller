@@ -2,11 +2,11 @@
 # This is a project Makefile. It is assumed the directory this Makefile resides in is a
 # project subdirectory.
 #
-
+CONFIG_CHIP_NAME := BL602
 PROJECT_NAME := custom_app
 PROJECT_PATH := $(abspath .)
 PROJECT_BOARD := evb
-export PROJECT_PATH PROJECT_BOARD
+export PROJECT_PATH PROJECT_BOARD CONFIG_CHIP_NAME
 #CONFIG_TOOLPREFIX :=
 
 HTML = page.html
