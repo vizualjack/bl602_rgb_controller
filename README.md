@@ -1,7 +1,7 @@
 # RGB/W Controller Firmware for BL602
 ### Web UI
-![Screenshot 1](doc_images/1.png)
-![Screenshot 2](doc_images/2.png)
+<img src="doc_images/1.png" alt="Screenshot 1" width="500">
+<img src="doc_images/2.png" alt="Screenshot 1" width="500">
 
 ### Features
 - Control RGB/W stripe via http / rest or udp server
