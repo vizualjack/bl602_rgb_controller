@@ -1,6 +1,6 @@
-# 🔴🟢🔵 RGB/W Controller Firmware for BL602 🔴🟢🔵
+## 🔴🟢🔵 RGB/W Controller Firmware for BL602 🔴🟢🔵
 ### 📸 Screenshots of WebUI
-<img src="doc_images/1.png" alt="Screenshot 1" width="250"> <img src="doc_images/2.png" alt="Screenshot 2" width="250">
+<img src="doc_images/1.png" alt="Screenshot 1" width="3ß0"> <img src="doc_images/2.png" alt="Screenshot 2" width="300">
 
 ### 📝 Features
 - Control RGB/W stripe via http / rest or udp server ([See details](server_defintions.md))
@@ -16,7 +16,7 @@ You can find the several firmware formats in the [release tab](https://github.co
 I will provide one method for installing and updating.
 
 ## ⚙️ Installing onto your device via UART (Windows)
-📋 **Requirements**: [Downloading the firmware (.bin)](#downloading-the-firmware)<br/>
+📋 **Requirements**: [Downloading the firmware (.bin)](#-downloading-the-firmware)<br/>
 ### 1. 🔌 **Connecting the board**
 **Pins (+ State) you need**: BOOT(**HIGH**), RX, TX, GROUND
 #### 📱 **For these boards:** Pine64 BL602 EVB ver 1.1 / Pine64 Pinenut-01S / Boufallo Lab BL602 Dev Module
@@ -38,7 +38,7 @@ When everything is connected and the boot pin is set to high, you power up the d
 
 
 ## 🔄 Updating the firmware
-📋 **Requirements**: [Downloading the firmware (.bin.xz)](#downloading-the-firmware)<br/>
+📋 **Requirements**: [Downloading the firmware (.bin.xz)](#-downloading-the-firmware)<br/>
 If you wanna update this firmware on your device I would recommend the OTA method you can find under the **Firmware Upload** area which uses the **.bin.xz** format.
 
 
@@ -55,7 +55,7 @@ If you wanna update this firmware on your device I would recommend the OTA metho
 📄 Output firmware file: `.../this/repo/customer_app/custom_app/build_out/custom_app.bin`
 
 ### 📦 **Building the OTA versions of the firmware**
-📋 **Requirements**: [Python](https://www.python.org/downloads/), [Building the firmware](#building-the-firmware)
+📋 **Requirements**: [Python](https://www.python.org/downloads/), [Building the firmware](#-building-the-firmware)
 #### Windows:
 	cd ...\this\repo\customer_app\custom_app
 	build_ota.bat
