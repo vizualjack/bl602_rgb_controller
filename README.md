@@ -1,7 +1,7 @@
 # RGB/W Controller Firmware for BL602
-### Web UI
-<img src="doc_images/1.png" alt="Screenshot 1" width="500">
-<img src="doc_images/2.png" alt="Screenshot 1" width="500">
+### Screenshots of WebUI
+<img src="doc_images/1.png" alt="Screenshot 1" width="250">
+<img src="doc_images/2.png" alt="Screenshot 2" width="250">
 
 ### Features
 - Control RGB/W stripe via http / rest or udp server
@@ -13,11 +13,8 @@
 
 ### Install onto your device
 You can find the several firmware formats in the release tab, depending on your board, firmware and the method you wanna use.
-
 For further help you can take a look at [this documentation](https://pine64.github.io/bl602-docs/).
-
 The flash tool can also be found here: .../this/repo/tools/flash_tool
-
 This is the recommended flash configuration:
 ![alt text](doc_images/flash_tool_config.png)
 
