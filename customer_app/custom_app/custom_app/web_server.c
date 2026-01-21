@@ -47,18 +47,7 @@ void handle_get_requests(int fd, const char* buffer) {
         send(fd,response_header, strlen(response_header), 0);
         // netconn_write(conn, js_script, content_length, NETCONN_NOCOPY);
         send(fd, js_script, content_length, 0);
-    } else if(strstr(buffer, "GET /switch_light") != NULL) {
-        const char *response =
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/html\r\n"
-            "Connection: close\r\n\r\n"
-            "Switched light";
-        bool turn_on = strstr(buffer, "turn=on") != NULL;
-        float pwm_duty = turn_on ? 10.f : 0.f;
-        set_rgbw_duty(pwm_duty, pwm_duty, pwm_duty, pwm_duty);
-        // netconn_write(conn, response, strlen(response), NETCONN_NOCOPY);
-        send(fd, response, strlen(response), 0);
-    } 
+    }
     else {
         const char *response_header_template =
             "HTTP/1.1 200 OK\r\n"
@@ -372,29 +361,20 @@ void handle_hostname(int fd, const char* body) {
     trigger_delayed_reboot();
 }
 
-int get_color_value_from_json(const char* json, char color_key) {
+float get_color_value_from_json(const char* json, char color_key) {
     char search_key[4];
-    int val;
     snprintf(search_key, sizeof(search_key), "\"%c\":", color_key);
     char* value_start = strstr(json, search_key);
     if (value_start == NULL) return -1;
-    sscanf(value_start + 4, "%d", &val);
-    return val;
+    return strtof(value_start + 4, NULL);
 }
 
 void handle_new_duty(int fd, const char* body) {
-    int r, g, b, w;
-    r = get_color_value_from_json(body, 'r');
-    g = get_color_value_from_json(body, 'g');
-    b = get_color_value_from_json(body, 'b');
-    w = get_color_value_from_json(body, 'w');
-    printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
-
     float red, green, blue, white;
-    red =  r / 255.f * 100;
-    green = g / 255.f * 100;
-    blue = b / 255.f * 100;
-    white = w / 255.f * 100;
+    red = get_color_value_from_json(body, 'r');
+    green = get_color_value_from_json(body, 'g');
+    blue = get_color_value_from_json(body, 'b');
+    white = get_color_value_from_json(body, 'w');
     printf("r = %f, g = %f, b = %f, w = %f\n", red, green, blue, white);
 
     // update_rgbw_duties(r, g, b, w);
