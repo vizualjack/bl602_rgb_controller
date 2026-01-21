@@ -31,23 +31,23 @@ void udp_server(void *pvParameters) {
                 // printf("g: %i\r\n", data[1]);
                 // printf("b: %i\r\n", data[2]);
                 // printf("w: %i\r\n", data[3]);
-                int *nums = (int *)data;
+                float *nums = (float *)data;
 
                 // Convert from network byte order to host byte order
-                int r = ntohl(nums[0]);
-                int g = ntohl(nums[1]);
-                int b = ntohl(nums[2]);
-                int w = ntohl(nums[3]);
+                float r = nums[0];
+                float g = nums[1];
+                float b = nums[2];
+                float w = nums[3];
 
                 // Print the received integers
-                printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
+                // printf("r = %d, g = %d, b = %d, w = %d\n", r, g, b, w);
 
                 float red, green, blue, white;
-                red =  r / 255.f * 100;
-                green = g / 255.f * 100;
-                blue = b / 255.f * 100;
-                white = w / 255.f * 100;
-                printf("r = %f, g = %f, b = %f, w = %f\n", red, green, blue, white);
+                red =  r; // / 255.f * 100;
+                green = g; // / 255.f * 100;
+                blue = b; // / 255.f * 100;
+                white = w; // / 255.f * 100;
+                // printf("r = %f, g = %f, b = %f, w = %f\n", red, green, blue, white);
                 set_rgbw_duty(red, green, blue, white);
                 netbuf_delete(netbuf);
                 // puts("[udp_server] Udp packet handled successfully\n");
