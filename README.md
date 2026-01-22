@@ -1,65 +1,73 @@
 ## 🔴🟢🔵 RGB/W Controller Firmware for BL602 🔴🟢🔵
-### 📸 Screenshots of WebUI
+### 📸 Screenshots of the Web UI
 <img src="doc_images/1.png" alt="Screenshot 1" width="300"> <img src="doc_images/2.png" alt="Screenshot 2" width="300">
 
 ### 📝 Features
-- Control RGB/W stripe via http / rest or udp server ([See details](server_defintions.md))
-- Pin to color mapping
-- Set device hostname (e.g. used in the router)
-- Set wifi settings
-- Creates a wifi hotspot for initial configuration
-- Updates via OTA
+- Control RGB/W strip via HTTP (REST) or UDP ([API details](server_defintions.md))
+- Flexible pin-to-color mapping
+- Configurable device hostname (e.g. visible in your router)
+- Wi-Fi configuration
+- Built-in Wi-Fi hotspot for initial setup
+- Over-the-air (OTA) firmware updates
 
 
 ## 📥 Downloading the firmware
-You can find the several firmware formats in the [releases section](https://github.com/vizualjack/bl602_rgb_controller/releases), depending on your board, firmware and the method you wanna use.<br/>
-I will provide one method for installing and updating.
+Several firmware formats are available in the [Releases](https://github.com/vizualjack/bl602_rgb_controller/releases) section, depending on your board, firmware and flashing method.
 
 ## ⚙️ Installing onto your device via UART (Windows)
 📋 **Requirements**: [Downloading the firmware (.bin)](#-downloading-the-firmware)<br/>
 ### 1. 🔌 **Connecting the board**
-**Pins (+ State) you need**: BOOT(**HIGH**), RX, TX, GROUND
-#### 📱 **For these boards:** Pine64 BL602 EVB ver 1.1 / Pine64 Pinenut-01S / Boufallo Lab BL602 Dev Module
-You should find the needed information here in [this documentation](https://pine64.github.io/bl602-docs/Quickstart_Guide/connecting_the_hardware.html).<br/>
-#### 📱 **For other boards**
-Depending on the board, you should see all needed connections to the pins marked on the board itself or there is already some connector (e.g usb-c) wired on the board that you can use and a switch to toggle the boot pin state.<br/>
-Hopefully you can find a good documentation on how to find these.<br/>
-Maybe you also needed some extra devices (e.g serial to usb converter) but this varies from board to board so that's why I can't provide further informations here.
+**Required pins (and state):** BOOT (**HIGH**), RX, TX, GROUND
+#### 📱 **Pine64 BL602 EVB ver 1.1** · **Pine64 Pinenut-01S** · **Boufallo Lab BL602 Dev Module**
+Refer to the official documentation [here](https://pine64.github.io/bl602-docs/Quickstart_Guide/connecting_the_hardware.html).<br/>
+#### 📱 **Other boards**
+Pin locations are usually labeled directly on the board, or available via onboard connectors (e.g. USB-C) and boot switches.
+Depending on the board, you may also need additional hardware such as a USB-to-serial adapter.
 
-### 2. 🛠️ **Setup the flash tool**
+Please consult the documentation of your specific board for details.
+
+### 2. 🛠️ **Set up the flash tool**
 The flash tool can be found here: `.../this/repo/tools/flash_tool`<br/>
-This is the recommended flash configuration:<br/>
+Use the following **recommended flash configuration**:<br/>
 <img src="doc_images/flash_tool_config.png" alt="Config screenshot" width="250"><br/>
-The only setting you need to adjust is the "COM Port".<br/>
-To identify the right one I would recommend the device manager, the device should pop up under the **Ports (COM & LPT)** area.
+The only setting you need to change is the **COM Port**.<br/>
+You can find the correct port in **Device Manager**.<br/>
+The device will appear under **Ports (COM & LPT)** when connected to your PC.
 
 ### 3. 🚀 **Flashing**
-When everything is connected and the boot pin is set to high, you power up the device and press **Create & Download** button in the flash tool
+Once everything is connected and the **BOOT** pin is set to **HIGH**, power up the device and click **Create & Download** in the flash tool.
 
 
 ## 🔄 Updating the firmware
-📋 **Requirements**: [Downloading the firmware (.bin.xz)](#-downloading-the-firmware)<br/>
-If you wanna update this firmware on your device I would recommend the OTA method you can find under the **Firmware Upload** area which uses the **.bin.xz** format.
+📋 **Requirements**: [Downloading the firmware (.bin.xz)](#-downloading-the-firmware)<br/><br/>
+For firmware updates, using the **OTA method** is recommended.<br/>
+It is available under the **Firmware Upload** section in the Web UI and uses the **.bin.xz** format.
 
 
 ## 💻 Development
-⚠️Whitespaces in your path / folder names could be mess this up⚠️
+⚠️ **Avoid whitespaces in path names. This may cause build issues**
 ### 📦 **Building the firmware**
 📋 **Requirements**: [cmake](https://cmake.org/)
-#### Windows:
+#### **Windows**
 	cd ...\this\repo\customer_app\custom_app
 	build.bat
-#### Linux / MSYS:
+#### **Linux / MSYS**
 	cd .../this/repo/customer_app/custom_app
 	./build
-📄 Output firmware file: `.../this/repo/customer_app/custom_app/build_out/custom_app.bin`
+📄 **Output firmware file**
+```
+.../this/repo/customer_app/custom_app/build_out/custom_app.bin
+```
 
 ### 📦 **Building the OTA versions of the firmware**
 📋 **Requirements**: [Python](https://www.python.org/downloads/), [Building the firmware](#-building-the-firmware)
-#### Windows:
+#### **Windows**
 	cd ...\this\repo\customer_app\custom_app
 	build_ota.bat
-#### Linux / MSYS:
+#### **Linux / MSYS**
 	cd .../this/repo/customer_app/custom_app
 	./build_ota
-📄 Output directory: `.../this/repo/customer_app/custom_app/build_out/ota/dts40M_pt2M_boot2release_c84015`
+📄 **Output directory** 
+```
+.../this/repo/customer_app/custom_app/build_out/ota/dts40M_pt2M_boot2release_c84015
+```
