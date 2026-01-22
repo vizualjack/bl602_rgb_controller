@@ -12,7 +12,7 @@
 
 
 ## 📥 Downloading the firmware
-You can find the several firmware formats in the [release tab](https://github.com/vizualjack/bl602_rgb_controller/releases), depending on your board, firmware and the method you wanna use.<br/>
+You can find the several firmware formats in the [releases section](https://github.com/vizualjack/bl602_rgb_controller/releases), depending on your board, firmware and the method you wanna use.<br/>
 I will provide one method for installing and updating.
 
 ## ⚙️ Installing onto your device via UART (Windows)
