@@ -24,10 +24,10 @@ All values are in little endian style.<br/>
 Value range for all parameters: 0 - 100<br/>
 Total packet size: 16 bytes
 
-		RED - float (4 bytes) <br/>
-		GREEN - float (4 bytes) <br/>
-		BLUE - float (4 bytes) <br/>
-		WHITE - float (4 bytes) <br/>
+		RED - float (4 bytes)
+		GREEN - float (4 bytes)
+		BLUE - float (4 bytes)
+		WHITE - float (4 bytes)
 
 #### Python example:
 ```python
